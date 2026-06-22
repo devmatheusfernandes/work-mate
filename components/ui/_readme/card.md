@@ -1,0 +1,1 @@
+#Use global.css style

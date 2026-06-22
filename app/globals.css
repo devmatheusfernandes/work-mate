@@ -1,28 +1,18 @@
+@import '../styles/_variables.scss';
+@import '../styles/_keyframe-animations.scss';
+
 @import "tailwindcss";
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
 
 @custom-variant dark (&:is(.dark *));
+@custom-variant pwa (@media (display-mode: standalone));
 
-@theme inline {
+@theme {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-sans);
+  --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
-  --font-heading: var(--font-sans);
-  --color-sidebar-ring: var(--sidebar-ring);
-  --color-sidebar-border: var(--sidebar-border);
-  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
-  --color-sidebar-accent: var(--sidebar-accent);
-  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
-  --color-sidebar-primary: var(--sidebar-primary);
-  --color-sidebar-foreground: var(--sidebar-foreground);
-  --color-sidebar: var(--sidebar);
-  --color-chart-5: var(--chart-5);
-  --color-chart-4: var(--chart-4);
-  --color-chart-3: var(--chart-3);
-  --color-chart-2: var(--chart-2);
-  --color-chart-1: var(--chart-1);
   --color-ring: var(--ring);
   --color-input: var(--input);
   --color-border: var(--border);
@@ -39,92 +29,273 @@
   --color-popover: var(--popover);
   --color-card-foreground: var(--card-foreground);
   --color-card: var(--card);
-  --radius-sm: calc(var(--radius) * 0.6);
-  --radius-md: calc(var(--radius) * 0.8);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) * 1.4);
-  --radius-2xl: calc(var(--radius) * 1.8);
-  --radius-3xl: calc(var(--radius) * 2.2);
-  --radius-4xl: calc(var(--radius) * 2.6);
+  --radius-xl: calc(var(--radius) + 4px);
+
+  --color-content-color: var(--base-content);
+  --color-header-color: var(--base-header);
 }
 
 :root {
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
+  --radius: 0.65rem;
+  --background: oklch(95.815% 0.00011 271.152);
+  --foreground: oklch(0.141 0.005 285.823);
   --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
+  --card-foreground: oklch(0.141 0.005 285.823);
   --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
-  --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
-  --chart-1: oklch(0.87 0 0);
-  --chart-2: oklch(0.556 0 0);
-  --chart-3: oklch(0.439 0 0);
-  --chart-4: oklch(0.371 0 0);
-  --chart-5: oklch(0.269 0 0);
-  --radius: 0.625rem;
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: oklch(0.205 0 0);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.97 0 0);
-  --sidebar-accent-foreground: oklch(0.205 0 0);
-  --sidebar-border: oklch(0.922 0 0);
-  --sidebar-ring: oklch(0.708 0 0);
+  --popover-foreground: oklch(0.141 0.005 285.823);
+  --primary: oklch(0.541 0.281 293.009);
+  --primary-foreground: oklch(0.969 0.016 293.756);
+  --secondary: oklch(0.967 0.001 286.375);
+  --secondary-foreground: oklch(0.21 0.006 285.885);
+  --muted: oklch(0.967 0.001 286.375);
+  --muted-foreground: oklch(0.552 0.016 285.938);
+  --accent: oklch(0.967 0.001 286.375);
+  --accent-foreground: oklch(0.21 0.006 285.885);
+  --destructive: oklch(58.6% 0.253 17.585);
+  --border: oklch(0.92 0.004 286.32);
+  --input: oklch(0.92 0.004 286.32);
+  --ring: oklch(0.702 0.183 293.541);
+
+  --base-content: oklch(100% 0.00011 271.152);
+  --base-header: oklch(95.514% 0.00011 271.152);
 }
 
 .dark {
-  --background: oklch(0.145 0 0);
+  --background: oklch(0.141 0.005 285.823);
   --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
+  --card: oklch(0.175 0.042 264.55);
   --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0);
+  --popover: oklch(0.21 0.006 285.885);
   --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.922 0 0);
-  --primary-foreground: oklch(0.205 0 0);
-  --secondary: oklch(0.269 0 0);
+  --primary: oklch(0.606 0.25 292.717);
+  --primary-foreground: oklch(0.969 0.016 293.756);
+  --secondary: oklch(0.274 0.006 286.033);
   --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.269 0 0);
+  --muted: oklch(0.274 0.006 286.033);
+  --muted-foreground: oklch(0.705 0.015 286.067);
+  --accent: oklch(0.274 0.006 286.033);
   --accent-foreground: oklch(0.985 0 0);
-  --destructive: oklch(0.704 0.191 22.216);
+  --destructive: oklch(63.7% 0.237 25.331);
   --border: oklch(1 0 0 / 10%);
   --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.556 0 0);
-  --chart-1: oklch(0.87 0 0);
-  --chart-2: oklch(0.556 0 0);
-  --chart-3: oklch(0.439 0 0);
-  --chart-4: oklch(0.371 0 0);
-  --chart-5: oklch(0.269 0 0);
-  --sidebar: oklch(0.205 0 0);
-  --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.488 0.243 264.376);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.269 0 0);
-  --sidebar-accent-foreground: oklch(0.985 0 0);
-  --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.556 0 0);
+  --ring: oklch(0.38 0.189 293.745);
+
+  --base-content: oklch(17.8% 0.031 264);
+  --base-header: oklch(12.048% 0.02283 254.114);
+}
+
+@layer components {
+  .header-layout {
+    @apply lg:bg-content-color lg:border-b lg:border-b-background lg:rounded-t-xl md:bg-content-color md:rounded-t-none md:border-b-0 bg-header-color rounded-t-none border-b border-b-primary lg:pwa:bg-content-color lg:pwa:border-b-3 lg:pwa:border-b-background lg:pwa:rounded-t-xl md:pwa:bg-content-color md:pwa:border-b md:pwa:border-b-background md:pwa:rounded-t-xl pwa:bg-header-color pwa:rounded-t-none pwa:border-b-0 backdrop-blur;
+  }
+
+  .sub-header-layout {
+    @apply bg-content-color;
+  }
+
+  .vault-bar-layout {
+    @apply bg-header-color border-t border-t-primary pwa:border-none rounded-none;
+  }
+
+  .content-layout {
+    @apply bg-content-color lg:rounded-b-xl md:rounded-b-none rounded-b-none;
+  }
+
+  /* --- Layout Geral --- */
+  .container {
+    @apply p-2.5 md:p-4 lg:px-6 lg:py-4 min-w-full pb-24;
+  }
+
+  .card {
+    @apply duration-150 ease-in-out transition-all rounded-md border border-slate-200/50 dark:border-slate-700/50 bg-slate-300/15 dark:bg-slate-950/40 hover:border-slate-500/30 dark:hover:border-slate-800 hover:bg-slate-100/80 dark:hover:bg-gray-950/50;
+  }
+
+  .step-content {
+    @apply max-w-5xl mx-auto p-4 md:p-12 text-center animate-in fade-in slide-in-from-bottom-4 duration-500;
+  }
+
+  .item {
+    @apply duration-150 ease-in-out transition-all rounded-md border border-slate-200/50 dark:border-slate-700/50 bg-white/15 dark:bg-slate-800/40 hover:border-slate-500/30 dark:hover:border-slate-600 hover:bg-white/5 dark:hover:bg-gray-800/60;
+  }
+
+  .input {
+    @apply duration-150 ease-in-out transition-all rounded-md border border-slate-200/50 dark:border-slate-700/50 bg-slate-300/30 dark:bg-gray-900 hover:border-slate-500/30 dark:hover:border-slate-600 placeholder:text-gray-500 dark:placeholder:text-gray-400 font-normal data-placeholder:text-gray-500 dark:data-placeholder:text-gray-400 hover:bg-white/5 dark:hover:bg-gray-800 focus:bg-white/25 dark:focus:bg-gray-800 focus-visible:outline-none focus-visible:ring-0 focus-visible:ring-blue-500/20 dark:focus-visible:ring-blue-400/20 disabled:cursor-not-allowed disabled:opacity-50 disabled:bg-gray-50 dark:disabled:bg-gray-900;
+  }
+
+  .title {
+    @apply text-2xl font-bold text-primary;
+  }
+
+  .subtitle {
+    @apply text-lg font-semibold text-secondary-foreground;
+  }
+
+  .paragraph {
+    @apply text-xs font-medium text-secondary-foreground/80;
+  }
+
+  .custom-scrollbar {
+    scrollbar-width: thin;
+    scrollbar-color: var(--primary) transparent;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar {
+    width: 5px;
+    height: 5px;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar-thumb {
+    @apply bg-primary/20 rounded-full hover:bg-primary/40 transition-colors;
+  }
+
+  .fade-in {
+    animation: fadeIn 0.5s ease-in forwards;
+  }
+
+  .fade-out {
+    animation: fadeOut 0.5s ease-out forwards;
+  }
 }
 
 @layer base {
+  html {
+    scroll-behavior: smooth;
+
+    /* Impede o "Pull-to-refresh" (Puxar para baixo para recarregar a página) 
+          e aquele efeito "elástico" chato no fim da página no iOS */
+    overscroll-behavior-y: none;
+
+    /* Impede o "Double-tap to zoom" (Zoom ao dar dois toques rápidos) */
+    touch-action: manipulation;
+  }
+
   * {
     @apply border-border outline-ring/50;
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+
+    .no-scrollbar::-webkit-scrollbar {
+      display: none;
+    }
+
+    .no-scrollbar {
+      -ms-overflow-style: none;
+      scrollbar-width: none;
+    }
+
+    /* 3. Tira o azul feio de clique (você já tinha, mas reforçando) */
+    -webkit-tap-highlight-color: transparent;
+
+    /* 4. Impede que o usuário selecione/copie o texto da interface sem querer ao segurar o dedo */
+    -webkit-user-select: none;
+    user-select: none;
+
+    /* 5. Impede que apareça aquele menu de contexto nativo do iOS (Copiar/Salvar) 
+          quando o usuário segura o dedo em uma imagem ou link */
+    -webkit-touch-callout: none;
   }
+
   body {
     @apply bg-background text-foreground;
+    -webkit-tap-highlight-color: transparent;
   }
-  html {
-    @apply font-sans;
+
+  /* 6. EXTREMAMENTE IMPORTANTE: Devolve a capacidade de selecionar 
+        e digitar texto apenas onde é necessário (inputs e textareas) */
+  input,
+  textarea,
+  [contenteditable="true"] {
+    -webkit-user-select: auto;
+    user-select: auto;
   }
+
+  /* =========================================
+     SUPORTE AO NOTCH (Safe Areas do iPhone)
+     ========================================= */
+  /* Se você tiver um Header ou Bottom Bar colado na borda, use isso para 
+     evitar que fique debaixo da câmera ou da barra de navegação do iPhone */
+  .safe-padding-top {
+    padding-top: env(safe-area-inset-top);
+  }
+
+  .safe-padding-bottom {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+}
+
+/* TEMAS */
+.theme-violet {
+  --primary: oklch(0.541 0.281 293.009);
+  --primary-foreground: oklch(0.969 0.016 293.756);
+  --ring: oklch(0.702 0.183 293.541);
+  --sidebar-primary: oklch(0.541 0.281 293.009);
+  --sidebar-primary-foreground: oklch(0.969 0.016 293.756);
+  --sidebar-ring: oklch(0.702 0.183 293.541);
+}
+
+.theme-rose {
+  --primary: oklch(0.69 0.25 22);
+  --primary-foreground: oklch(0.985 0 0);
+  --ring: oklch(0.69 0.25 22);
+  --sidebar-primary: oklch(0.69 0.25 22);
+  --sidebar-primary-foreground: oklch(0.985 0 0);
+  --sidebar-ring: oklch(0.69 0.25 22);
+}
+
+.theme-indigo {
+  --primary: oklch(0.45 0.24 270);
+  --primary-foreground: oklch(0.985 0 0);
+  --ring: oklch(0.45 0.24 270);
+  --sidebar-primary: oklch(0.45 0.24 270);
+  --sidebar-primary-foreground: oklch(0.985 0 0);
+  --sidebar-ring: oklch(0.45 0.24 270);
+}
+
+.theme-yellow {
+  --primary: oklch(82.8% 0.189 84.429);
+  --primary-foreground: oklch(0.21 0.006 285.885);
+  --ring: oklch(82.8% 0.189 84.429);
+  --sidebar-primary: oklch(82.8% 0.189 84.429);
+  --sidebar-primary-foreground: oklch(0.21 0.006 285.885);
+  --sidebar-ring: oklch(82.8% 0.189 84.429);
+}
+
+.theme-green {
+  --primary: oklch(59.6% 0.145 163.225);
+  --primary-foreground: oklch(0.985 0 0);
+  --ring: oklch(59.6% 0.145 163.225);
+  --sidebar-primary: oklch(59.6% 0.145 163.225);
+  --sidebar-primary-foreground: oklch(0.985 0 0);
+  --sidebar-ring: oklch(59.6% 0.145 163.225);
+}
+
+/*PARA O CLIP PATH ANIMTION DO THEME SWITCHER*/
+/* Configuração para a transição de tema com clip-path */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation: none;
+  mix-blend-mode: normal;
+}
+
+/* Garante que o novo tema sempre "cresça" por cima do antigo */
+::view-transition-new(root) {
+  z-index: 1;
+}
+
+/* PWA Splash Screen Optimization */
+.pwa-initializing #vault-root {
+  visibility: hidden !important;
+  opacity: 0 !important;
+}
+
+.pwa-initializing body {
+  overflow: hidden !important;
+  background-color: #212121 !important;
 }
