@@ -1,0 +1,306 @@
+{
+  "tags": [
+    {
+      "userId": "user_matheus",
+      "id": "tag_estudos",
+      "title": "Estudos",
+      "color": "bg-blue-500",
+      "createdAt": "2026-06-22T20:00:00.000Z",
+      "updatedAt": "2026-06-22T20:00:00.000Z"
+    },
+    {
+      "userId": "user_matheus",
+      "id": "tag_trabalho",
+      "title": "Trabalho",
+      "color": "bg-purple-500",
+      "createdAt": "2026-06-22T20:00:00.000Z",
+      "updatedAt": "2026-06-22T20:00:00.000Z"
+    },
+    {
+      "userId": "user_matheus",
+      "id": "tag_ideias",
+      "title": "Ideias",
+      "color": "bg-green-500",
+      "createdAt": "2026-06-22T20:00:00.000Z",
+      "updatedAt": "2026-06-22T20:00:00.000Z"
+    }
+  ],
+  "folders": [
+    {
+      "userId": "user_matheus",
+      "id": "folder_dev",
+      "title": "Desenvolvimento",
+      "parentId": null,
+      "color": "bg-blue-500",
+      "archived": false,
+      "trashed": false,
+      "createdAt": "2026-06-22T20:00:00.000Z",
+      "updatedAt": "2026-06-22T20:00:00.000Z",
+      "isLocked": false
+    },
+    {
+      "userId": "user_matheus",
+      "id": "folder_design",
+      "title": "Design & UI",
+      "parentId": null,
+      "color": "bg-pink-500",
+      "archived": false,
+      "trashed": false,
+      "createdAt": "2026-06-22T20:01:00.000Z",
+      "updatedAt": "2026-06-22T20:01:00.000Z",
+      "isLocked": false
+    },
+    {
+      "userId": "user_matheus",
+      "id": "folder_5smpveihh",
+      "title": "12321212",
+      "parentId": null,
+      "color": "bg-blue-500",
+      "archived": false,
+      "trashed": false,
+      "createdAt": "2026-06-22T20:26:46.737Z",
+      "updatedAt": "2026-06-22T20:26:46.737Z",
+      "isLocked": false
+    }
+  ],
+  "notes": [
+    {
+      "userId": "user_matheus",
+      "id": "note_w4lvsngnh",
+      "title": "Nova Notamkmkkkkkkk",
+      "content": "<ul data-type=\"taskList\"><li data-checked=\"false\" data-type=\"taskItem\"><label><input type=\"checkbox\"><span></span></label><div><p>kjkj</p></div></li><li data-checked=\"false\" data-type=\"taskItem\"><label><input type=\"checkbox\"><span></span></label><div><p>kj</p></div></li><li data-checked=\"false\" data-type=\"taskItem\"><label><input type=\"checkbox\"><span></span></label><div><p>kj</p></div></li><li data-checked=\"true\" data-type=\"taskItem\"><label><input type=\"checkbox\" checked=\"checked\"><span></span></label><div><p>j</p></div></li><li data-checked=\"false\" data-type=\"taskItem\"><label><input type=\"checkbox\"><span></span></label><div><p>kj</p></div></li><li data-checked=\"false\" data-type=\"taskItem\"><label><input type=\"checkbox\"><span></span></label><div><p>kkjkj</p></div></li></ul><p></p>",
+      "searchText": "kjkj           kj           kj           j           kj           kkjkj",
+      "tagIds": [],
+      "folderId": null,
+      "archived": false,
+      "trashed": false,
+      "pinned": false,
+      "createdAt": "2026-06-22T20:30:04.446Z",
+      "updatedAt": "2026-06-22T22:01:15.364Z",
+      "type": "task",
+      "fileUrl": null,
+      "isLocked": false,
+      "taskStatus": "in_progress",
+      "taskDeadline": null,
+      "taskSubtasks": [],
+      "taskShouldNotify": false
+    },
+    {
+      "userId": "user_matheus",
+      "id": "note_g30xun1kt",
+      "title": "Nova Nota",
+      "content": "<p>mkmkmkkmkmkmkmk</p>",
+      "searchText": "mkmkmkkmkmkmkmk",
+      "tagIds": [],
+      "folderId": null,
+      "archived": false,
+      "trashed": false,
+      "pinned": false,
+      "createdAt": "2026-06-22T20:26:17.989Z",
+      "updatedAt": "2026-06-22T21:46:31.869Z",
+      "type": "task",
+      "fileUrl": null,
+      "isLocked": false,
+      "taskStatus": "in_progress",
+      "taskDeadline": null,
+      "taskSubtasks": [],
+      "taskShouldNotify": false
+    },
+    {
+      "userId": "user_matheus",
+      "id": "note_nextjs",
+      "title": "Guia de Boas Práticas do Next.js App Router",
+      "content": "<h1>Next.js 15+ App Router</h1><p>Algumas boas práticas fundamentais incluem:</p><ul><li><p>Manter componentes do cliente na base da árvore de renderização (RSCs por padrão).</p></li><li><p>Utilizar Server Actions para todas as mutações e requisições de escrita.</p></li><li><p>Evitar o vazamento de erros de banco para o cliente.</p></li></ul><p></p><ul data-type=\"taskList\"><li data-checked=\"false\" data-type=\"taskItem\"><label><input type=\"checkbox\"><span></span></label><div><p>lklklk</p></div></li><li data-checked=\"true\" data-type=\"taskItem\"><label><input type=\"checkbox\" checked=\"checked\"><span></span></label><div><p>klk</p></div></li><li data-checked=\"false\" data-type=\"taskItem\"><label><input type=\"checkbox\"><span></span></label><div><p>lk</p></div></li><li data-checked=\"false\" data-type=\"taskItem\"><label><input type=\"checkbox\"><span></span></label><div><p>lklk</p></div></li></ul><p></p>",
+      "searchText": "Next.js 15+ App Router  Algumas boas práticas fundamentais incluem:    Manter componentes do cliente na base da árvore de renderização (RSCs por padrão).    Utilizar Server Actions para todas as mutações e requisições de escrita.    Evitar o vazamento de erros de banco para o cliente.              lklklk           klk           lk           lklk",
+      "tagIds": [
+        "tag_estudos",
+        "tag_trabalho"
+      ],
+      "folderId": "folder_dev",
+      "archived": false,
+      "trashed": false,
+      "pinned": true,
+      "createdAt": "2026-06-22T20:05:00.000Z",
+      "updatedAt": "2026-06-22T20:49:59.409Z",
+      "type": "note",
+      "fileUrl": null,
+      "isLocked": false
+    },
+    {
+      "userId": "user_matheus",
+      "id": "note_colors",
+      "title": "Paletas de Cores Harmônicas",
+      "content": "<h1>Guia de UI/UX</h1><p>Evite cores genéricas como vermelho ou azul puros. Prefira tons HSL curados para criar interfaces modernas e agradáveis para o usuário.</p>",
+      "searchText": "Guia de UI/UX Evite cores genéricas como vermelho ou azul puros. Prefira tons HSL curados para criar interfaces modernas e agradáveis para o usuário.",
+      "tagIds": [
+        "tag_ideias"
+      ],
+      "folderId": "folder_design",
+      "archived": false,
+      "trashed": false,
+      "pinned": false,
+      "createdAt": "2026-06-22T20:06:00.000Z",
+      "updatedAt": "2026-06-22T20:06:00.000Z",
+      "type": "note",
+      "fileUrl": null,
+      "isLocked": false
+    },
+    {
+      "userId": "user_matheus",
+      "id": "note_dummy_pdf",
+      "title": "Apostila de Introdução ao React.pdf",
+      "content": null,
+      "searchText": "Apostila de Introdução ao React PDF",
+      "tagIds": [
+        "tag_estudos"
+      ],
+      "folderId": "folder_dev",
+      "archived": false,
+      "trashed": false,
+      "pinned": false,
+      "createdAt": "2026-06-22T20:07:00.000Z",
+      "updatedAt": "2026-06-22T20:07:00.000Z",
+      "type": "pdf",
+      "fileUrl": "https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf",
+      "isLocked": false
+    },
+    {
+      "userId": "user_matheus",
+      "id": "note_scratch",
+      "title": "Ideias Soltas",
+      "content": "<h1>Rascunho</h1><p>Lembrar de comprar pão e testar a nova biblioteca de animações.</p>",
+      "searchText": "Rascunho Lembrar de comprar pão e testar a nova biblioteca de animações.",
+      "tagIds": [
+        "tag_ideias"
+      ],
+      "folderId": null,
+      "archived": false,
+      "trashed": false,
+      "pinned": true,
+      "createdAt": "2026-06-22T20:08:00.000Z",
+      "updatedAt": "2026-06-22T21:46:38.560Z",
+      "type": "task",
+      "fileUrl": null,
+      "isLocked": true,
+      "taskStatus": "done",
+      "taskDeadline": null,
+      "taskSubtasks": [],
+      "taskShouldNotify": false
+    },
+    {
+      "userId": "user_matheus",
+      "id": "note_task_api",
+      "title": "Implementar endpoints da API REST",
+      "content": "<p>Criar os endpoints de CRUD para o módulo de usuários, incluindo autenticação JWT e validação de payloads com Zod.</p>",
+      "searchText": "Criar os endpoints de CRUD para o módulo de usuários, incluindo autenticação JWT e validação de payloads com Zod.",
+      "tagIds": [
+        "tag_trabalho"
+      ],
+      "folderId": "folder_design",
+      "archived": false,
+      "trashed": false,
+      "pinned": false,
+      "createdAt": "2026-06-22T18:00:00.000Z",
+      "updatedAt": "2026-06-22T21:47:04.044Z",
+      "type": "note",
+      "fileUrl": null,
+      "isLocked": false,
+      "taskStatus": null,
+      "taskDeadline": null,
+      "taskSubtasks": [],
+      "taskShouldNotify": false
+    },
+    {
+      "userId": "user_matheus",
+      "id": "note_task_design",
+      "title": "Redesign da página de login",
+      "content": "<p>Aplicar o novo design system com glassmorphism e gradientes sutis. Garantir acessibilidade WCAG 2.1 AA.</p>",
+      "searchText": "Aplicar o novo design system com glassmorphism e gradientes sutis. Garantir acessibilidade WCAG 2.1 AA.",
+      "tagIds": [
+        "tag_ideias"
+      ],
+      "folderId": "folder_design",
+      "archived": false,
+      "trashed": false,
+      "pinned": false,
+      "createdAt": "2026-06-22T17:00:00.000Z",
+      "updatedAt": "2026-06-22T21:47:53.726Z",
+      "type": "task",
+      "fileUrl": null,
+      "isLocked": false,
+      "taskStatus": "to_start",
+      "taskDeadline": "2026-06-25T23:59:00.000Z",
+      "taskSubtasks": [
+        {
+          "id": "sub_4",
+          "title": "Criar wireframes mobile",
+          "completed": true
+        },
+        {
+          "id": "sub_5",
+          "title": "Implementar componentes",
+          "completed": false
+        }
+      ],
+      "taskShouldNotify": false
+    },
+    {
+      "userId": "user_matheus",
+      "id": "note_task_docs",
+      "title": "Documentar arquitetura do projeto",
+      "content": "<p>Criar diagrama C4 e documentar as camadas Service/Repository/Action com exemplos práticos.</p>",
+      "searchText": "Criar diagrama C4 e documentar as camadas Service/Repository/Action com exemplos práticos.",
+      "tagIds": [
+        "tag_estudos",
+        "tag_trabalho"
+      ],
+      "folderId": null,
+      "archived": false,
+      "trashed": false,
+      "pinned": false,
+      "createdAt": "2026-06-22T16:00:00.000Z",
+      "updatedAt": "2026-06-22T16:00:00.000Z",
+      "type": "task",
+      "fileUrl": null,
+      "isLocked": false,
+      "taskStatus": "done",
+      "taskDeadline": "2026-06-20T23:59:00.000Z",
+      "taskSubtasks": [
+        {
+          "id": "sub_6",
+          "title": "Diagrama C4",
+          "completed": true
+        },
+        {
+          "id": "sub_7",
+          "title": "Documentar Service layer",
+          "completed": true
+        }
+      ],
+      "taskShouldNotify": false
+    },
+    {
+      "userId": "user_matheus",
+      "id": "note_task_perf",
+      "title": "Otimizar performance do dashboard",
+      "content": "<p>Investigar re-renders desnecessários, implementar React.memo nos cards e virtualizar listas longas.</p>",
+      "searchText": "Investigar re-renders desnecessários, implementar React.memo nos cards e virtualizar listas longas.",
+      "tagIds": [
+        "tag_trabalho"
+      ],
+      "folderId": "folder_dev",
+      "archived": false,
+      "trashed": false,
+      "pinned": false,
+      "createdAt": "2026-06-22T15:00:00.000Z",
+      "updatedAt": "2026-06-22T15:00:00.000Z",
+      "type": "task",
+      "fileUrl": null,
+      "isLocked": false,
+      "taskStatus": "to_start",
+      "taskDeadline": null,
+      "taskSubtasks": [],
+      "taskShouldNotify": true
+    }
+  ]
+}

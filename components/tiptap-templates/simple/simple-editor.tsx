@@ -1,7 +1,9 @@
 "use client"
 
-import { useRef, useState } from "react"
-import { EditorContent, EditorContext, useEditor } from "@tiptap/react"
+import { useRef, useState, useEffect } from "react"
+import { useRouter } from "next/navigation"
+import { EditorContent, EditorContext, useEditor, type Content } from "@tiptap/react"
+import { ArrowLeft } from "lucide-react"
 
 // --- Tiptap Core Extensions ---
 import { StarterKit } from "@tiptap/starter-kit"
@@ -17,6 +19,7 @@ import { Selection } from "@tiptap/extensions"
 // --- UI Primitives ---
 import { Button } from "@/components/tiptap-ui-primitive/button"
 import { Spacer } from "@/components/tiptap-ui-primitive/spacer"
+import { Input } from "@/components/ui/input"
 import {
   Toolbar,
   ToolbarGroup,
@@ -71,19 +74,48 @@ import { handleImageUpload, MAX_FILE_SIZE } from "@/lib/tiptap-utils"
 // --- Styles ---
 import "@/components/tiptap-templates/simple/simple-editor.scss"
 
-import content from "@/components/tiptap-templates/simple/data/content.json"
+interface SimpleEditorProps {
+  content?: Content;
+  title?: string;
+  onChange?: (html: string) => void;
+  onTitleChange?: (newTitle: string) => void;
+}
 
 const MainToolbarContent = ({
   onHighlighterClick,
   onLinkClick,
   isMobile,
+  title,
+  onTitleChange,
+  onBack,
 }: {
   onHighlighterClick: () => void
   onLinkClick: () => void
   isMobile: boolean
+  title: string
+  onTitleChange: (v: string) => void
+  onBack: () => void
 }) => {
   return (
     <>
+      <ToolbarGroup className="flex-shrink-0 shrink-0 flex items-center gap-1">
+        <button
+          onClick={onBack}
+          className="flex h-8 w-8 items-center justify-center rounded-full hover:bg-muted text-muted-foreground hover:text-foreground transition-colors cursor-pointer border-none outline-none"
+        >
+          <ArrowLeft className="size-4" />
+        </button>
+
+        <div className="w-[180px] max-w-[200px]">
+          <Input
+            value={title}
+            onChange={(e) => onTitleChange(e.target.value)}
+            placeholder="Título da nota..."
+            className="h-8 border-none bg-transparent hover:bg-muted/40 focus:bg-background focus:ring-1 focus:ring-primary/20 text-xs font-semibold rounded-md"
+          />
+        </div>
+      </ToolbarGroup>
+
       <Spacer />
 
       <ToolbarGroup>
@@ -144,7 +176,6 @@ const MainToolbarContent = ({
       <Spacer />
 
       {isMobile && <ToolbarSeparator />}
-
     </>
   )
 }
@@ -178,13 +209,27 @@ const MobileToolbarContent = ({
   </>
 )
 
-export function SimpleEditor() {
+export function SimpleEditor({
+  content = "",
+  title = "Nova Nota",
+  onChange,
+  onTitleChange,
+}: SimpleEditorProps) {
+  const router = useRouter()
   const isMobile = useIsBreakpoint()
   const { height } = useWindowSize()
   const [mobileView, setMobileView] = useState<"main" | "highlighter" | "link">(
     "main"
   )
   const toolbarRef = useRef<HTMLDivElement>(null)
+
+  const [localTitle, setLocalTitle] = useState(title)
+  const [prevTitle, setPrevTitle] = useState(title)
+
+  if (title !== prevTitle) {
+    setLocalTitle(title)
+    setPrevTitle(title)
+  }
 
   const editor = useEditor({
     immediatelyRender: false,
@@ -224,7 +269,21 @@ export function SimpleEditor() {
       }),
     ],
     content,
+    onUpdate({ editor }) {
+      onChange?.(editor.getHTML())
+    },
   })
+
+  // Sync content if it changes externally
+  useEffect(() => {
+    if (editor && content !== undefined) {
+      const isString = typeof content === "string";
+      const currentHTML = editor.getHTML();
+      if (isString && currentHTML !== content) {
+        editor.commands.setContent(content);
+      }
+    }
+  }, [editor, content])
 
   const toolbarRect = useRefRect(toolbarRef)
 
@@ -233,9 +292,13 @@ export function SimpleEditor() {
     overlayHeight: toolbarRect.height,
   })
 
-  // Adjust state during render to avoid synchronous cascading renders in useEffect
   if (!isMobile && mobileView !== "main") {
     setMobileView("main")
+  }
+
+  const handleTitleChangeLocal = (val: string) => {
+    setLocalTitle(val)
+    onTitleChange?.(val)
   }
 
   return (
@@ -256,6 +319,9 @@ export function SimpleEditor() {
               onHighlighterClick={() => setMobileView("highlighter")}
               onLinkClick={() => setMobileView("link")}
               isMobile={isMobile}
+              title={localTitle}
+              onTitleChange={handleTitleChangeLocal}
+              onBack={() => router.push("/hub/notes")}
             />
           ) : (
             <MobileToolbarContent
@@ -274,3 +340,4 @@ export function SimpleEditor() {
     </div>
   )
 }
+export default SimpleEditor

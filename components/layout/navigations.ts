@@ -4,6 +4,7 @@ import {
   Settings,
   Trash,
   MessageSquare,
+  KanbanSquare,
 } from "lucide-react";
 import { MenuItemType } from "./types";
 
@@ -27,8 +28,7 @@ export const sidebarNavItems: MenuItemType[] = [
   {
     href: "/hub/tasks",
     label: "Tarefas",
-    Icon: CheckSquare,
-    badgeCount: 3,
+    Icon: KanbanSquare,
   },
   {
     href: "/hub/settings",
