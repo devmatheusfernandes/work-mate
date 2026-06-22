@@ -2,9 +2,8 @@ import {
   User,
   CheckSquare,
   Settings,
-  Users,
   Trash,
-  Calendar,
+  MessageSquare,
 } from "lucide-react";
 import { MenuItemType } from "./types";
 
@@ -21,14 +20,9 @@ export const sidebarNavItems: MenuItemType[] = [
     badgeCount: 3,
   },
   {
-    href: "/hub/trash",
-    label: "Lixeira",
-    Icon: Trash,
-  },
-  {
-    href: "/hub/calendar",
-    label: "Calendário",
-    Icon: Calendar,
+    href: "/hub/chat",
+    label: "Conversas",
+    Icon: MessageSquare,
   },
   {
     href: "/hub/tasks",
@@ -37,14 +31,14 @@ export const sidebarNavItems: MenuItemType[] = [
     badgeCount: 3,
   },
   {
-    href: "/hub/team",
-    label: "Equipe",
-    Icon: Users,
-  },
-  {
     href: "/hub/settings",
     label: "Configurações",
     labelKey: "settings",
     Icon: Settings,
+  },
+  {
+    href: "/hub/trash",
+    label: "Lixeira",
+    Icon: Trash,
   },
 ];
