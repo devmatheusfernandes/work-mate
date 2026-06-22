@@ -1,0 +1,61 @@
+import throttle from "lodash.throttle"
+
+import { useUnmount } from "@/hooks/use-unmount"
+import { useEffect, useMemo, useRef } from "react"
+
+interface ThrottleSettings {
+  leading?: boolean | undefined
+  trailing?: boolean | undefined
+}
+
+const defaultOptions: ThrottleSettings = {
+  leading: false,
+  trailing: true,
+}
+
+/**
+ * A hook that returns a throttled callback function.
+ *
+ * @param fn The function to throttle
+ * @param wait The time in ms to wait before calling the function
+ * @param dependencies The dependencies to watch for changes (unused but kept for compatibility)
+ * @param options The throttle options
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function useThrottledCallback<T extends (...args: any[]) => any>(
+  fn: T,
+  wait = 250,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  _dependencies: React.DependencyList = [],
+  options: ThrottleSettings = defaultOptions
+): {
+  (this: ThisParameterType<T>, ...args: Parameters<T>): ReturnType<T>
+  cancel: () => void
+  flush: () => void
+} {
+  const fnRef = useRef(fn)
+
+  useEffect(() => {
+    fnRef.current = fn
+  })
+
+  const handler = useMemo(
+    () => {
+      // eslint-disable-next-line react-hooks/refs
+      const throttled = throttle((...args: Parameters<T>) => {
+        return fnRef.current(...args)
+      }, wait, options)
+      return throttled
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [wait, options.leading, options.trailing]
+  )
+
+  useUnmount(() => {
+    handler.cancel()
+  })
+
+  return handler
+}
+
+export default useThrottledCallback
