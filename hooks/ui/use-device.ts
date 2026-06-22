@@ -76,6 +76,29 @@ export const useDeviceStore = create<DeviceStore>((set, get) => ({
   },
 }));
 
+if (typeof window !== "undefined") {
+  const checkMobile = () => {
+    useDeviceStore.getState().setIsMobile(window.innerWidth < 768);
+  };
+  
+  const checkStandalone = () => {
+    const standalone = window.matchMedia("(display-mode: standalone)").matches 
+      || !!(window.navigator as Navigator & { standalone?: boolean }).standalone 
+      || document.referrer.includes("android-app://");
+    useDeviceStore.getState().setStandalone(standalone);
+  };
+
+  checkMobile();
+  checkStandalone();
+
+  window.addEventListener("resize", checkMobile);
+
+  window.addEventListener("beforeinstallprompt", (e) => {
+    e.preventDefault();
+    useDeviceStore.getState().setDeferredPrompt(e as BeforeInstallPromptEvent);
+  });
+}
+
 /**
  * Unified hook for Device and PWA state
  */

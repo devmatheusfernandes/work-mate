@@ -6,8 +6,9 @@ import { ArrowLeft, Search, X } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
 import { cn } from "@/lib/utils";
-import { useIsMobile } from "@/hooks/ui/use-device";
+import { useDevice } from "@/hooks/ui/use-device";
 import { Button, buttonVariants } from "@/components/ui/button";
+import { SidebarTrigger } from "./sidebar-trigger";
 import { Input } from "@/components/ui/input";
 import { ThemeSwitcher } from "../ui/theme-switcher";
 import { NotificationBell } from "@/modules/notification/_components/NotificationBell";
@@ -54,7 +55,8 @@ const Header = React.forwardRef<HTMLDivElement, HeaderProps>(({
     ...props
 }, ref) => {
     const { user: storeUser, hasHydrated } = useUserStore();
-    const isMobile = useIsMobile();
+    const { isMobile, isStandalone } = useDevice();
+    const isMobileOrPwa = isMobile || isStandalone;
     const [isSearchOpen, setIsSearchOpen] = React.useState(false);
     const [searchValue, setSearchValue] = React.useState("");
     const debouncedSearch = useDebounce(searchValue, 400);
@@ -133,7 +135,7 @@ const Header = React.forwardRef<HTMLDivElement, HeaderProps>(({
             {showHeader && (
                 <header className="header-layout sticky top-0 z-40 flex h-12 w-full items-center justify-between px-4 md:px-6">
                     <AnimatePresence mode="wait">
-                        {isMobile && isSearchOpen ? (
+                        {isMobileOrPwa && isSearchOpen ? (
                             <motion.div
                                 key="mobile-search"
                                 initial={{ opacity: 0, y: -10 }}
@@ -176,11 +178,13 @@ const Header = React.forwardRef<HTMLDivElement, HeaderProps>(({
                                             <span className="sr-only">Voltar</span>
                                         </Link>
                                     ) : (
-                                        isMobile ? renderActions(true) : null
+                                        isMobileOrPwa ? (
+                                            <SidebarTrigger className="-ml-2" />
+                                        ) : null
                                     )}
                                 </div>
 
-                                {!isMobile && (
+                                {!isMobileOrPwa && (
                                     <div className="flex w-2/4 sm:w-1/3 justify-center items-center overflow-hidden">
                                         <h1 className="text-lg font-semibold tracking-tight truncate">
                                             {title}
@@ -189,7 +193,7 @@ const Header = React.forwardRef<HTMLDivElement, HeaderProps>(({
                                 )}
 
                                 <div className="flex w-3/4 sm:w-1/3 items-center justify-end gap-1 sm:gap-2">
-                                    {isMobile ? (
+                                    {isMobileOrPwa ? (
                                         <>
                                             {onSearchChange && (
                                                 <Button variant="ghost" size="icon" onClick={() => setIsSearchOpen(true)}>
@@ -197,6 +201,8 @@ const Header = React.forwardRef<HTMLDivElement, HeaderProps>(({
                                                 </Button>
                                             )}
                                             {backHref ? renderActions(true) : null}
+                                            <ThemeSwitcher />
+                                            <NotificationBell />
                                             {displayUser && <UserMenu user={displayUser} />}
                                         </>
                                     ) : (
@@ -227,7 +233,7 @@ const Header = React.forwardRef<HTMLDivElement, HeaderProps>(({
 
             {showSubHeader && (
                 <div className="sub-header-layout flex px-4 pt-4 md:px-6 w-full">
-                    {isMobile ? (
+                    {isMobileOrPwa ? (
                         <div className="flex flex-col w-full">
                             <h1 className="text-xl font-bold tracking-tight text-foreground">
                                 {title}

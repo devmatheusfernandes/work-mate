@@ -13,6 +13,7 @@ import { useRef } from "react";
 interface SidebarItemProps {
   item: MenuItemType;
   isCollapsed: boolean;
+  onClick?: () => void;
 }
 
 interface AnimatedIconHandle {
@@ -20,7 +21,7 @@ interface AnimatedIconHandle {
   stopAnimation?: () => void;
 }
 
-export default function SidebarItem({ item, isCollapsed }: SidebarItemProps) {
+export default function SidebarItem({ item, isCollapsed, onClick }: SidebarItemProps) {
   const pathname = usePathname();
   const isActive =
     isPathActive(pathname, item.href) ||
@@ -120,6 +121,7 @@ export default function SidebarItem({ item, isCollapsed }: SidebarItemProps) {
               >
                 <Link
                   href={subItem.href}
+                  onClick={onClick}
                   className={twMerge(
                     "flex items-center h-10 px-3 py-2 rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground transition-colors duration-200",
                     isPathActive(pathname, subItem.href) &&
@@ -152,7 +154,7 @@ export default function SidebarItem({ item, isCollapsed }: SidebarItemProps) {
   }
 
   return (
-    <Link href={item.href}>
+    <Link href={item.href} onClick={onClick}>
       <motion.div
         whileHover={{ x: isCollapsed ? 0 : 4, scale: isCollapsed ? 1.05 : 1 }}
         whileTap={{ scale: 0.98 }}

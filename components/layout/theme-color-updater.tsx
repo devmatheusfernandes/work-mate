@@ -3,6 +3,7 @@
 import { useEffect } from "react";
 import { useTheme } from "next-themes";
 import { usePathname } from "next/navigation";
+import { useAppearanceStore } from "@/modules/appearance/appearance.store";
 
 declare global {
   interface Window {
@@ -13,6 +14,16 @@ declare global {
 export function ThemeColorUpdater() {
   const { resolvedTheme } = useTheme();
   const pathname = usePathname();
+  const { themeColor } = useAppearanceStore();
+
+  // Sync theme accent color class (violet, rose, etc) on the html tag
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const root = document.documentElement;
+    const colorClasses = ["theme-violet", "theme-rose", "theme-indigo", "theme-yellow", "theme-green"];
+    root.classList.remove(...colorClasses);
+    root.classList.add(`theme-${themeColor}`);
+  }, [themeColor]);
 
   useEffect(() => {
     const updateColor = () => {

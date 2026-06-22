@@ -1,25 +1,50 @@
 "use client";
-import { usePathname } from "next/navigation";
+import * as React from "react";
 import { twMerge } from "tailwind-merge";
 import { motion } from "framer-motion";
 import SidebarItem from "./sidebar-item";
 import { MenuItemType } from "@/components/layout/types";
 import { useCollapsedStore } from "./collapsed-store";
 import { SidebarTrigger } from "./sidebar-trigger";
-import Logo from "@/public/brand/logo.png";
-import Image from "next/image";
+import { sidebarNavItems } from "./navigations";
+import { useDevice } from "@/hooks/ui/use-device";
+import { Vault, VaultContent, VaultTitle } from "@/components/ui/vault";
 
 export interface SidebarProps {
-    items: MenuItemType[];
+    items?: MenuItemType[];
 }
 
-export const Sidebar: React.FC<SidebarProps> = ({ items }) => {
-    const pathname = usePathname();
+export const Sidebar: React.FC<SidebarProps> = ({ items = sidebarNavItems }) => {
     const isCollapsed = useCollapsedStore((state) => state.isCollapsed);
+    const setCollapsed = useCollapsedStore((state) => state.setCollapsed);
+    const { isMobile, isStandalone } = useDevice();
+    const isMobileOrPwa = isMobile || isStandalone;
 
-    //Para esconder a sidebar
-    const isPracticeSession = pathname.includes("/hub/student/practice/session");
-    if (isPracticeSession) return null;
+    React.useEffect(() => {
+        if (isMobileOrPwa) {
+            setCollapsed(true);
+        }
+    }, [isMobileOrPwa, setCollapsed]);
+
+    if (isMobileOrPwa) {
+        return (
+            <Vault open={!isCollapsed} onOpenChange={(open) => setCollapsed(!open)}>
+                <VaultContent aria-label="Menu de Navegação" noPadding className="h-full max-h-[85vh]">
+                    <VaultTitle className="sr-only">Menu de Navegação</VaultTitle>
+                    <div className="flex flex-col gap-1 py-4 px-3">
+                        {items.map((item) => (
+                            <SidebarItem 
+                                key={item.href} 
+                                item={item} 
+                                isCollapsed={false} 
+                                onClick={() => setCollapsed(true)} 
+                            />
+                        ))}
+                    </div>
+                </VaultContent>
+            </Vault>
+        );
+    }
 
     return (
         <>
@@ -49,7 +74,6 @@ export const Sidebar: React.FC<SidebarProps> = ({ items }) => {
                             "flex items-center mb-4 transition-all duration-300",
                             isCollapsed ? "justify-center" : "px-3 justify-between"
                         )}>
-                            {!isCollapsed && <Image src={Logo} alt="Logo" width={140} style={{ height: "auto" }} priority /> }
                             <SidebarTrigger />
                         </div>
 

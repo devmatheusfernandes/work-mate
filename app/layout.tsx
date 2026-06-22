@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import { Quicksand, Geist_Mono } from "next/font/google";
 import "./globals.css";
+import { ThemeProvider } from "@/components/theme-provider";
+import { ThemeColorUpdater } from "@/components/layout/theme-color-updater";
 
 const quicksand = Quicksand({
   variable: "--font-sans",
@@ -26,8 +28,20 @@ export default function RootLayout({
     <html
       lang="en"
       className={`${quicksand.variable} ${geistMono.variable} h-full antialiased`}
+      suppressHydrationWarning
     >
-      <body className="min-h-full flex flex-col">{children}</body>
+      <body className="min-h-full flex flex-col">
+        <ThemeProvider
+          attribute="class"
+          defaultTheme="system"
+          enableSystem
+          disableTransitionOnChange
+        >
+          <ThemeColorUpdater />
+          {children}
+          <div id="vault-root" />
+        </ThemeProvider>
+      </body>
     </html>
   );
 }
