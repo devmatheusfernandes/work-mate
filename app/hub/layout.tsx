@@ -1,5 +1,6 @@
 import { Sidebar } from "@/components/layout/sidebar";
 import { ChatSidebar } from "@/components/layout/chat-sidebar";
+import { CalendarSidebar } from "@/components/layout/calendar-sidebar";
 
 export default function HubLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -11,6 +12,7 @@ export default function HubLayout({ children }: { children: React.ReactNode }) {
         </div>
       </main>
       <ChatSidebar />
+      <CalendarSidebar />
     </div>
   );
 }

@@ -1,0 +1,306 @@
+"use client";
+
+import { useState, useEffect } from "react";
+import { useTheme } from "next-themes";
+import { useAppearanceStore, ThemeColor, ThemeMode } from "@/modules/appearance/appearance.store";
+import { useCalendarStore } from "@/modules/calendar/calendar.store";
+import { Calendar } from "@/modules/calendar/calendar.schema";
+import { Button } from "@/components/ui/button";
+import {
+  Empty,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+  EmptyDescription,
+} from "@/components/ui/empty";
+import {
+  CalendarDays,
+  Settings2,
+  Trash2,
+  Plus,
+  Sun,
+  Moon,
+  Monitor,
+  Check,
+} from "lucide-react";
+import { cn } from "@/lib/utils";
+
+interface SettingsContainerProps {
+  initialCalendars: Calendar[];
+  user: {
+    id: string;
+    name: string;
+    email: string;
+    role: string;
+  };
+}
+
+const THEME_COLORS: { value: ThemeColor; label: string; bg: string }[] = [
+  { value: "violet", label: "Violeta", bg: "bg-[#8b5cf6]" },
+  { value: "rose", label: "Rosa", bg: "bg-[#f43f5e]" },
+  { value: "indigo", label: "Índigo", bg: "bg-[#6366f1]" },
+  { value: "yellow", label: "Amarelo", bg: "bg-[#eab308]" },
+  { value: "green", label: "Verde", bg: "bg-[#22c55e]" },
+];
+
+const PRESET_CALENDAR_COLORS = [
+  "bg-blue-500",
+  "bg-emerald-500",
+  "bg-indigo-500",
+  "bg-rose-500",
+  "bg-amber-500",
+  "bg-cyan-500",
+  "bg-red-500",
+  "bg-violet-500",
+];
+
+export function SettingsContainer({ initialCalendars, user }: SettingsContainerProps) {
+  const [activeTab, setActiveTab] = useState<"geral" | "calendario">("geral");
+  const { setTheme } = useTheme();
+  const { themeColor, setThemeColor, mode, setMode } = useAppearanceStore();
+  const { calendars, addCalendar, removeCalendar } = useCalendarStore();
+  
+  // Create Calendar Form State
+  const [newCalendarName, setNewCalendarName] = useState("");
+  const [selectedColor, setSelectedColor] = useState("bg-blue-500");
+
+  useEffect(() => {
+    // Seed/sync store with initial server data
+    useCalendarStore.setState({ calendars: initialCalendars });
+  }, [initialCalendars]);
+
+  const handleModeChange = (newMode: ThemeMode) => {
+    setMode(newMode);
+    setTheme(newMode);
+  };
+
+  const handleAddCalendar = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newCalendarName.trim()) return;
+    
+    const success = await addCalendar(newCalendarName.trim(), selectedColor);
+    if (success) {
+      setNewCalendarName("");
+    }
+  };
+
+  return (
+    <div className="flex flex-col gap-6 md:flex-row md:items-start max-w-6xl mx-auto w-full pb-16">
+      {/* Tabs Sidebar Selector */}
+      <aside className="w-full md:w-64 shrink-0 flex flex-row md:flex-col gap-1.5 border-b md:border-b-0 md:border-r border-border/30 pb-4 md:pb-0 md:pr-4">
+        <button
+          onClick={() => setActiveTab("geral")}
+          className={cn(
+            "flex items-center gap-2.5 px-4 py-2 text-xs font-semibold rounded-lg transition-all cursor-pointer flex-1 md:flex-none justify-center md:justify-start",
+            activeTab === "geral"
+              ? "bg-primary text-primary-foreground"
+              : "text-muted-foreground hover:bg-muted/50 hover:text-foreground"
+          )}
+        >
+          <Settings2 className="size-4" />
+          Aparência & Perfil
+        </button>
+        <button
+          onClick={() => setActiveTab("calendario")}
+          className={cn(
+            "flex items-center gap-2.5 px-4 py-2 text-xs font-semibold rounded-lg transition-all cursor-pointer flex-1 md:flex-none justify-center md:justify-start",
+            activeTab === "calendario"
+              ? "bg-primary text-primary-foreground"
+              : "text-muted-foreground hover:bg-muted/50 hover:text-foreground"
+          )}
+        >
+          <CalendarDays className="size-4" />
+          Configurações de Calendário
+        </button>
+      </aside>
+
+      {/* Tabs Content Panel */}
+      <div className="flex-1 w-full animate-in fade-in slide-in-from-bottom-4 duration-300">
+        {activeTab === "geral" ? (
+          <div className="space-y-6">
+            {/* User Profile Card */}
+            <div className="card p-5 space-y-4">
+              <h3 className="text-sm font-bold uppercase tracking-wider text-muted-foreground/60">
+                Perfil do Usuário
+              </h3>
+              <div className="flex items-center gap-4">
+                <div className="size-12 rounded-full bg-primary/10 border border-primary/20 flex items-center justify-center font-bold text-primary">
+                  {user.name.split(" ").map((n) => n[0]).join("")}
+                </div>
+                <div>
+                  <h4 className="text-sm font-semibold text-foreground">{user.name}</h4>
+                  <p className="text-xs text-muted-foreground">{user.role}</p>
+                  <p className="text-xs text-muted-foreground/70">{user.email}</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Mode (Theme Mode) Selector */}
+            <div className="card p-5 space-y-4">
+              <h3 className="text-sm font-bold uppercase tracking-wider text-muted-foreground/60">
+                Tema do Sistema
+              </h3>
+              <div className="grid grid-cols-3 gap-2.5 max-w-md">
+                {[
+                  { value: "light" as ThemeMode, label: "Claro", icon: Sun },
+                  { value: "dark" as ThemeMode, label: "Escuro", icon: Moon },
+                  { value: "system" as ThemeMode, label: "Sistema", icon: Monitor },
+                ].map((item) => {
+                  const Icon = item.icon;
+                  const active = mode === item.value;
+                  return (
+                    <button
+                      key={item.value}
+                      onClick={() => handleModeChange(item.value)}
+                      className={cn(
+                        "flex flex-col items-center justify-center p-3 rounded-xl border transition-all cursor-pointer gap-1.5",
+                        active
+                          ? "border-primary bg-primary/5 text-primary"
+                          : "border-border/50 hover:border-border text-muted-foreground hover:text-foreground"
+                      )}
+                    >
+                      <Icon className="size-4" />
+                      <span className="text-[10px] font-bold">{item.label}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Theme Colors */}
+            <div className="card p-5 space-y-4">
+              <h3 className="text-sm font-bold uppercase tracking-wider text-muted-foreground/60">
+                Cor de Destaque (Accent Color)
+              </h3>
+              <div className="flex gap-3 flex-wrap">
+                {THEME_COLORS.map((color) => {
+                  const active = themeColor === color.value;
+                  return (
+                    <button
+                      key={color.value}
+                      onClick={() => setThemeColor(color.value)}
+                      className={cn(
+                        "size-9 rounded-full flex items-center justify-center transition-all cursor-pointer relative",
+                        color.bg,
+                        active ? "ring-4 ring-primary/20 scale-105" : "hover:scale-105"
+                      )}
+                      title={color.label}
+                    >
+                      {active && <Check className="size-4 text-white" />}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div className="space-y-6">
+            {/* Add Calendar Form */}
+            <div className="card p-5 space-y-4">
+              <h3 className="text-sm font-bold uppercase tracking-wider text-muted-foreground/60">
+                Criar Novo Calendário
+              </h3>
+              <form onSubmit={handleAddCalendar} className="space-y-4 max-w-xl">
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-[10px] font-bold text-muted-foreground">
+                    Nome do Calendário
+                  </label>
+                  <input
+                    type="text"
+                    value={newCalendarName}
+                    onChange={(e) => setNewCalendarName(e.target.value)}
+                    placeholder="Ex: Estudos, Projetos, Família..."
+                    className="input h-9 px-3 text-xs w-full focus:outline-none"
+                  />
+                </div>
+
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-[10px] font-bold text-muted-foreground">
+                    Cor da Agenda
+                  </label>
+                  <div className="flex gap-2 flex-wrap">
+                    {PRESET_CALENDAR_COLORS.map((color) => {
+                      const active = selectedColor === color;
+                      return (
+                        <button
+                          key={color}
+                          type="button"
+                          onClick={() => setSelectedColor(color)}
+                          className={cn(
+                            "size-7 rounded-full flex items-center justify-center transition-all cursor-pointer",
+                            color,
+                            active ? "ring-4 ring-primary/20 scale-105" : "hover:scale-105"
+                          )}
+                        >
+                          {active && <Check className="size-3.5 text-white" />}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                <Button
+                  type="submit"
+                  disabled={!newCalendarName.trim()}
+                  className="w-full sm:w-auto text-xs font-semibold"
+                >
+                  <Plus className="size-3.5 mr-1" />
+                  Criar Calendário
+                </Button>
+              </form>
+            </div>
+
+            {/* List Calendars */}
+            <div className="card p-5 space-y-4">
+              <h3 className="text-sm font-bold uppercase tracking-wider text-muted-foreground/60">
+                Meus Calendários
+              </h3>
+              
+              {calendars.length === 0 ? (
+                <Empty className="py-8">
+                  <EmptyHeader>
+                    <EmptyMedia variant="icon">
+                      <CalendarDays className="size-5 text-muted-foreground" />
+                    </EmptyMedia>
+                    <EmptyTitle>Nenhum calendário</EmptyTitle>
+                    <EmptyDescription>
+                      Você ainda não possui calendários extras configurados.
+                    </EmptyDescription>
+                  </EmptyHeader>
+                </Empty>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {calendars.map((cal) => (
+                    <div
+                      key={cal.id}
+                      className="item flex items-center justify-between p-3.5"
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className={cn("size-3 rounded-full shrink-0", cal.backgroundColor)} />
+                        <div>
+                          <h4 className="text-xs font-bold text-foreground truncate max-w-[150px]">
+                            {cal.summary}
+                          </h4>
+                          <p className="text-[9px] text-muted-foreground">
+                            Google API Compatible
+                          </p>
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => removeCalendar(cal.id)}
+                        className="p-1 rounded text-muted-foreground hover:text-destructive hover:bg-muted/50 transition-colors cursor-pointer"
+                        title="Excluir Calendário"
+                      >
+                        <Trash2 className="size-3.5" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}

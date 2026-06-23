@@ -63,7 +63,7 @@ export function ChatSidebar() {
             exit={{ x: 50, opacity: 0 }}
             transition={{ type: "spring", stiffness: 300, damping: 25 }}
             onClick={() => setSidebarOpen(true)}
-            className="fixed right-0 top-2/5 -translate-y-1/2 z-30 flex items-center justify-center w-6 h-16 bg-muted/80 hover:bg-muted border border-r-0 border-border/50 rounded-l-lg transition-all cursor-pointer"
+            className="fixed right-0 top-[66%] -translate-y-1/2 z-30 flex items-center justify-center w-6 h-16 bg-muted/80 hover:bg-muted border border-r-0 border-border/50 rounded-l-lg transition-all cursor-pointer"
         >
           <Sparkles className="size-4 text-primary" />
           </motion.button>

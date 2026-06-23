@@ -1,0 +1,138 @@
+{
+  "calendars": [
+    {
+      "userId": "user_matheus",
+      "id": "cal_pessoal",
+      "summary": "Pessoal",
+      "backgroundColor": "bg-emerald-500",
+      "foregroundColor": "text-white",
+      "createdAt": "2026-06-22T00:00:00.000Z",
+      "updatedAt": "2026-06-22T00:00:00.000Z"
+    },
+    {
+      "userId": "user_matheus",
+      "id": "cal_trabalho",
+      "summary": "Trabalho",
+      "backgroundColor": "bg-indigo-500",
+      "foregroundColor": "text-white",
+      "createdAt": "2026-06-22T00:00:00.000Z",
+      "updatedAt": "2026-06-22T00:00:00.000Z"
+    }
+  ],
+  "events": [
+    {
+      "userId": "user_matheus",
+      "id": "evt_1",
+      "calendarId": "cal_trabalho",
+      "summary": "Daily Scrum",
+      "description": "Reunião rápida diária com o time de engenharia.",
+      "location": "Google Meet",
+      "start": {
+        "dateTime": "2026-06-23T09:00:00.000Z",
+        "timeZone": "America/Sao_Paulo"
+      },
+      "end": {
+        "dateTime": "2026-06-23T09:30:00.000Z",
+        "timeZone": "America/Sao_Paulo"
+      },
+      "status": "confirmed",
+      "createdAt": "2026-06-22T10:00:00.000Z",
+      "updatedAt": "2026-06-22T10:00:00.000Z"
+    },
+    {
+      "userId": "user_matheus",
+      "id": "evt_2",
+      "calendarId": "cal_trabalho",
+      "summary": "Alinhamento da Feature de Calendário",
+      "description": "Discussão de arquitetura da nova funcionalidade de agendas compartilhadas.",
+      "location": "Sala de Reuniões 1 / Discord",
+      "start": {
+        "dateTime": "2026-06-23T11:00:00.000Z",
+        "timeZone": "America/Sao_Paulo"
+      },
+      "end": {
+        "dateTime": "2026-06-23T12:30:00.000Z",
+        "timeZone": "America/Sao_Paulo"
+      },
+      "status": "confirmed",
+      "createdAt": "2026-06-22T10:05:00.000Z",
+      "updatedAt": "2026-06-22T10:05:00.000Z"
+    },
+    {
+      "userId": "user_matheus",
+      "id": "evt_3",
+      "calendarId": "cal_pessoal",
+      "summary": "Academia - Treino de Costas & Bíceps",
+      "description": "Foco em progressão de carga.",
+      "location": "SmartFit Centro",
+      "start": {
+        "dateTime": "2026-06-23T18:00:00.000Z",
+        "timeZone": "America/Sao_Paulo"
+      },
+      "end": {
+        "dateTime": "2026-06-23T19:30:00.000Z",
+        "timeZone": "America/Sao_Paulo"
+      },
+      "status": "confirmed",
+      "createdAt": "2026-06-22T10:10:00.000Z",
+      "updatedAt": "2026-06-22T10:10:00.000Z"
+    },
+    {
+      "userId": "user_matheus",
+      "id": "evt_4",
+      "calendarId": "cal_trabalho",
+      "summary": "Revisão de Código (PR #421)",
+      "description": "Revisar o código do módulo de notas e subtasks com Matheus.",
+      "location": "GitHub / Slack",
+      "start": {
+        "dateTime": "2026-06-24T10:00:00.000Z",
+        "timeZone": "America/Sao_Paulo"
+      },
+      "end": {
+        "dateTime": "2026-06-24T11:00:00.000Z",
+        "timeZone": "America/Sao_Paulo"
+      },
+      "status": "confirmed",
+      "createdAt": "2026-06-22T10:15:00.000Z",
+      "updatedAt": "2026-06-22T10:15:00.000Z"
+    },
+    {
+      "userId": "user_matheus",
+      "id": "evt_5",
+      "calendarId": "cal_pessoal",
+      "summary": "Jantar de Aniversário",
+      "description": "Comemorar aniversário com amigos no restaurante italiano.",
+      "location": "Cantina di Napoli",
+      "start": {
+        "dateTime": "2026-06-24T20:00:00.000Z",
+        "timeZone": "America/Sao_Paulo"
+      },
+      "end": {
+        "dateTime": "2026-06-24T22:30:00.000Z",
+        "timeZone": "America/Sao_Paulo"
+      },
+      "status": "confirmed",
+      "createdAt": "2026-06-22T10:20:00.000Z",
+      "updatedAt": "2026-06-22T10:20:00.000Z"
+    },
+    {
+      "userId": "user_matheus",
+      "id": "evt_6",
+      "calendarId": "cal_trabalho",
+      "summary": "Planejamento Quinzenal (Sprint 12)",
+      "description": "Discussão de novas demandas e refinamento de backlog.",
+      "location": "Zoom Meeting",
+      "start": {
+        "dateTime": "2026-06-22T14:00:00.000Z",
+        "timeZone": "America/Sao_Paulo"
+      },
+      "end": {
+        "dateTime": "2026-06-22T15:30:00.000Z",
+        "timeZone": "America/Sao_Paulo"
+      },
+      "status": "confirmed",
+      "createdAt": "2026-06-21T09:00:00.000Z",
+      "updatedAt": "2026-06-21T09:00:00.000Z"
+    }
+  ]
+}
