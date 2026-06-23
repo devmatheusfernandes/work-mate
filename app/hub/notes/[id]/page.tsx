@@ -1,7 +1,7 @@
 import { notesService } from "@/modules/notes/notes.service";
 import { getCurrentUser } from "@/lib/safe-action";
 import { Header } from "@/components/layout/header";
-import { buttonVariants } from "@/components/ui/button";
+import { buttonVariants } from "@/components/ui/button-variants";
 import { FileText, Download, ArrowLeft } from "lucide-react";
 import Link from "next/link";
 import { cn } from "@/lib/utils";

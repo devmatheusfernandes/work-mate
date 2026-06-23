@@ -439,11 +439,6 @@ export function CreateButton({ activeFolderId, tags }: CreateButtonProps) {
               )}
             </div>
           </VaultBody>
-          <VaultFooter>
-            <VaultSecondaryButton className="w-full" onClick={() => setActiveVault(null)}>
-              Fechar
-            </VaultSecondaryButton>
-          </VaultFooter>
         </VaultContent>
       </Vault>
     </>

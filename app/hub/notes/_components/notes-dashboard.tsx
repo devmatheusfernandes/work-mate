@@ -14,6 +14,7 @@ import { FileText, KanbanSquare } from "lucide-react";
 import { toast } from "sonner";
 import { deleteNoteAction, deleteFolderAction, updateNoteAction, updateFolderAction } from "@/modules/notes/notes.actions";
 import { useDevice } from "@/hooks/ui/use-device";
+import { SearchBar } from "@/components/ui/search-bar";
 
 interface NotesDashboardProps {
   notes: Note[];
@@ -227,7 +228,7 @@ export function NotesDashboard({
           title={currentFolder ? currentFolder.title : "Notas"}
           className="contents"
           backHref={backHref}
-          onSearchChange={setSearchQuery}
+          onSearchChange={isMobile ? setSearchQuery : undefined}
           showSubHeader={false}
           actions={headerActions}
         />
@@ -237,12 +238,23 @@ export function NotesDashboard({
           onDragOver={(e) => e.preventDefault()}
           onDrop={handleGridDrop}
         >
-          {/* Active Tag Filtering chips */}
-          <TagChips
-            tags={tags}
-            selectedTagId={selectedTagId}
-            onSelectTag={setSelectedTagId}
-          />
+          {/* Tags & Search Row */}
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 w-full">
+            <div className="flex-1 min-w-0">
+              <TagChips
+                tags={tags}
+                selectedTagId={selectedTagId}
+                onSelectTag={setSelectedTagId}
+              />
+            </div>
+            <div className="hidden md:block w-72 shrink-0">
+              <SearchBar
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Buscar notas..."
+              />
+            </div>
+          </div>
 
           {/* Dashboard Content Grid */}
           <div className="flex flex-col gap-6">

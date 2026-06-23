@@ -110,7 +110,7 @@ export function NoteCard({
         "group relative flex flex-col justify-between overflow-hidden rounded-xl transition-all duration-300 cursor-pointer min-h-[160px] p-4 text-left border shadow-none",
         isSelected
           ? "border-primary/50 bg-primary/5"
-          : "border-border/50 bg-card hover:border-border hover:bg-muted/10"
+          : "border-border/50 bg-card hover:border-border"
       )}
     >
       {/* Selection Circle */}

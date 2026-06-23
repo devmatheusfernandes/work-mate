@@ -321,7 +321,7 @@ export function TaskDetailsVault({
             className="flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl border border-border/50 bg-muted/20 text-sm font-medium text-foreground hover:bg-muted/40 transition-all"
           >
             Ver no Kanban
-            <ArrowRight className="size-4" />
+            <ArrowRight className="ml-2 size-4" />
           </Link>
         </VaultBody>
 

@@ -7,9 +7,5 @@ export default async function TasksPage() {
   const allNotes = await notesService.getNotes(user.id);
   const tasks = allNotes.filter((n) => n.type === "task" && !n.archived && !n.trashed);
 
-  return (
-    <div className="w-full h-full">
-      <KanbanBoard tasks={tasks} />
-    </div>
-  );
+  return <KanbanBoard tasks={tasks} />;
 }

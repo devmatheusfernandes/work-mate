@@ -74,12 +74,16 @@ function KanbanCard({
     e.dataTransfer.setData("text/plain", `task:${task.id}`);
   };
 
-  const completedSubs = (task.taskSubtasks || []).filter((s) => s.completed).length;
+  const completedSubs = (task.taskSubtasks || []).filter(
+    (s) => s.completed,
+  ).length;
   const totalSubs = (task.taskSubtasks || []).length;
   const progress = totalSubs > 0 ? (completedSubs / totalSubs) * 100 : 0;
   const hasDeadline = !!task.taskDeadline;
   const isOverdue =
-    hasDeadline && new Date(task.taskDeadline!) < new Date() && task.taskStatus !== "done";
+    hasDeadline &&
+    new Date(task.taskDeadline!) < new Date() &&
+    task.taskStatus !== "done";
 
   return (
     <div
@@ -91,7 +95,7 @@ function KanbanCard({
         "hover:bg-muted/10",
         isActive
           ? "border-primary/50 ring-1 ring-primary/20"
-          : "border-border/40 hover:border-border"
+          : "border-border/40 hover:border-border",
       )}
     >
       <div className="flex items-start justify-between gap-2">
@@ -145,7 +149,12 @@ function KanbanCard({
           </div>
         )}
         {hasDeadline && (
-          <span className={cn("flex items-center gap-0.5", isOverdue && "text-red-500")}>
+          <span
+            className={cn(
+              "flex items-center gap-0.5",
+              isOverdue && "text-red-500",
+            )}
+          >
             <Calendar className="size-2.5" />
             {new Date(task.taskDeadline!).toLocaleDateString("pt-BR", {
               day: "2-digit",
@@ -165,7 +174,7 @@ export function KanbanBoard({ tasks }: { tasks: Note[] }) {
 
   const selectedTask = useMemo(
     () => tasks.find((t) => t.id === selectedTaskId) ?? null,
-    [tasks, selectedTaskId]
+    [tasks, selectedTaskId],
   );
 
   const tasksByStatus = useMemo(() => {
@@ -215,7 +224,7 @@ export function KanbanBoard({ tasks }: { tasks: Note[] }) {
     if (!task) return;
 
     const currentIndex = STATUS_ORDER.indexOf(
-      (task.taskStatus || "to_start") as TaskStatus
+      (task.taskStatus || "to_start") as TaskStatus,
     );
     const newIndex = direction === "up" ? currentIndex - 1 : currentIndex + 1;
 
@@ -242,12 +251,12 @@ export function KanbanBoard({ tasks }: { tasks: Note[] }) {
   const isPanelOpen = !!selectedTask;
 
   return (
-    <div className="flex flex-col h-full min-h-screen">
+    <div className="flex flex-col h-full">
       <Header
         title="Tarefas"
-        subtitle="Quadro Kanban"
         backHref="/hub/notes"
-        showSubHeader={true}
+        showSubHeader={false}
+        className="contents"
       />
 
       <main className="flex-1 flex overflow-hidden">
@@ -255,12 +264,13 @@ export function KanbanBoard({ tasks }: { tasks: Note[] }) {
         <div
           className={cn(
             "flex-1 flex overflow-hidden transition-all duration-300",
-            isMobile ? "flex-col overflow-y-auto p-4 gap-4" : "flex-row p-4 gap-4"
+            isMobile
+              ? "flex-col overflow-y-auto p-4 gap-4"
+              : "flex-row p-4 gap-4",
           )}
         >
           {COLUMNS.map((col) => {
             const colTasks = tasksByStatus[col.status];
-
             return (
               <div
                 key={col.status}
@@ -275,7 +285,7 @@ export function KanbanBoard({ tasks }: { tasks: Note[] }) {
                   isMobile ? "min-h-[120px]" : "flex-1 min-w-0",
                   col.headerBg,
                   dragOverColumn === col.status &&
-                    "ring-2 ring-primary/30 border-primary/40"
+                    "ring-2 ring-primary/30 border-primary/40",
                 )}
               >
                 {/* Column Header */}
@@ -304,7 +314,7 @@ export function KanbanBoard({ tasks }: { tasks: Note[] }) {
                         task={task}
                         onClick={() =>
                           setSelectedTaskId(
-                            selectedTaskId === task.id ? null : task.id
+                            selectedTaskId === task.id ? null : task.id,
                           )
                         }
                         isActive={selectedTaskId === task.id}
@@ -312,7 +322,9 @@ export function KanbanBoard({ tasks }: { tasks: Note[] }) {
                         onMoveUp={() => handleMoveStatus(task.id, "up")}
                         onMoveDown={() => handleMoveStatus(task.id, "down")}
                         isFirst={col.status === STATUS_ORDER[0]}
-                        isLast={col.status === STATUS_ORDER[STATUS_ORDER.length - 1]}
+                        isLast={
+                          col.status === STATUS_ORDER[STATUS_ORDER.length - 1]
+                        }
                       />
                     ))
                   )}
@@ -350,6 +362,7 @@ export function KanbanBoard({ tasks }: { tasks: Note[] }) {
                   {/* Panel Content */}
                   <div className="flex-1 overflow-y-auto">
                     <TaskDetailPanel
+                      key={selectedTask.id}
                       task={selectedTask}
                       onClose={() => setSelectedTaskId(null)}
                     />

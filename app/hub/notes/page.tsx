@@ -9,13 +9,11 @@ export default async function NotesRootPage() {
   const tags = await notesService.getTags(user.id);
 
   return (
-    <div className="w-full h-full">
-      <NotesDashboard
-        notes={notes}
-        folders={folders}
-        tags={tags}
-        activeFolderId={null}
-      />
-    </div>
+    <NotesDashboard
+      notes={notes}
+      folders={folders}
+      tags={tags}
+      activeFolderId={null}
+    />
   );
 }
