@@ -46,6 +46,27 @@
   "notes": [
     {
       "userId": "user_matheus",
+      "id": "note_7a3ptjzox",
+      "title": "Nova Nota",
+      "content": null,
+      "searchText": null,
+      "tagIds": [],
+      "folderId": null,
+      "archived": false,
+      "trashed": false,
+      "pinned": false,
+      "createdAt": "2026-06-23T14:55:04.285Z",
+      "updatedAt": "2026-06-23T14:55:04.285Z",
+      "type": "note",
+      "fileUrl": null,
+      "isLocked": false,
+      "taskStatus": null,
+      "taskDeadline": null,
+      "taskSubtasks": [],
+      "taskShouldNotify": false
+    },
+    {
+      "userId": "user_matheus",
       "id": "note_dvd03ipha",
       "title": "Nova Nota",
       "content": null,
