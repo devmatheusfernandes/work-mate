@@ -7,7 +7,6 @@ import { useDevice } from "@/hooks/ui/use-device";
 import { useChatStore } from "@/modules/chat/chat.store";
 import { ChatInterface } from "@/modules/chat/_components/chat-interface";
 import { Vault, VaultContent, VaultTitle } from "@/components/ui/vault";
-import { cn } from "@/lib/utils";
 import { CreateButton } from "@/app/hub/notes/_components/create-button";
 
 export function ChatSidebar() {
@@ -64,14 +63,9 @@ export function ChatSidebar() {
             exit={{ x: 50, opacity: 0 }}
             transition={{ type: "spring", stiffness: 300, damping: 25 }}
             onClick={() => setSidebarOpen(true)}
-            className={cn(
-              "fixed right-0 top-1/3 -translate-y-1/2 z-40",
-              "flex items-center justify-center gap-1.5 w-10 h-14",
-              "bg-primary hover:bg-primary/95 text-white",
-              "border border-r-0 border-primary/10 rounded-l-xl transition-all duration-200 cursor-pointer hover:w-12"
-            )}
-          >
-            <Sparkles className="size-5 animate-pulse" />
+            className="fixed right-0 top-2/5 -translate-y-1/2 z-30 flex items-center justify-center w-6 h-16 bg-muted/80 hover:bg-muted border border-r-0 border-border/50 rounded-l-lg transition-all cursor-pointer"
+        >
+          <Sparkles className="size-4 text-primary" />
           </motion.button>
         )}
       </AnimatePresence>
