@@ -200,7 +200,7 @@ const Header = React.forwardRef<HTMLDivElement, HeaderProps>(({
                                                     <Search className="h-5 w-5" />
                                                 </Button>
                                             )}
-                                            {backHref ? renderActions(true) : null}
+                                            {renderActions(true)}
                                             <ThemeSwitcher />
                                             <NotificationBell />
                                             {displayUser && <UserMenu user={displayUser} />}

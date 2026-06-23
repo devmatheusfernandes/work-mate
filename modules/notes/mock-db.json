@@ -41,18 +41,6 @@
       "createdAt": "2026-06-22T20:01:00.000Z",
       "updatedAt": "2026-06-22T20:01:00.000Z",
       "isLocked": false
-    },
-    {
-      "userId": "user_matheus",
-      "id": "folder_5smpveihh",
-      "title": "12321212",
-      "parentId": null,
-      "color": "bg-blue-500",
-      "archived": false,
-      "trashed": false,
-      "createdAt": "2026-06-22T20:26:46.737Z",
-      "updatedAt": "2026-06-22T20:26:46.737Z",
-      "isLocked": false
     }
   ],
   "notes": [

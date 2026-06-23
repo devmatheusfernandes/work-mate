@@ -38,7 +38,7 @@ export function SelectionActionBar({
             onClick={onArchive}
             className="h-8 gap-1.5 text-xs text-muted-foreground hover:text-foreground cursor-pointer px-2"
           >
-            <Archive className="size-3.5" />
+            <Archive className="size-3.5 mr-2" />
             <span>Arquivar</span>
           </Button>
 
@@ -48,7 +48,7 @@ export function SelectionActionBar({
             onClick={onDelete}
             className="h-8 gap-1.5 text-xs text-destructive hover:text-destructive/90 cursor-pointer px-2"
           >
-            <Trash2 className="size-3.5" />
+            <Trash2 className="size-3.5 mr-2" />
             <span>Excluir</span>
           </Button>
 
@@ -60,7 +60,7 @@ export function SelectionActionBar({
             onClick={onClear}
             className="h-8 gap-1 text-xs hover:bg-muted text-muted-foreground cursor-pointer px-2"
           >
-            <X className="size-3.5" />
+            <X className="size-3.5 mr-2" />
             <span>Limpar</span>
           </Button>
         </div>

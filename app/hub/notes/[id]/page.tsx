@@ -29,9 +29,9 @@ export default async function NotePage({ params }: NotePageProps) {
       <div className="flex flex-col h-full min-h-screen pb-10">
         <Header
           title={note.title}
-          subtitle="Visualizando PDF"
           backHref={backHref}
-          showSubHeader={true}
+          showSubHeader={false}
+          className="contents"
         />
 
         <main className="container flex-1 py-6 flex flex-col gap-6">

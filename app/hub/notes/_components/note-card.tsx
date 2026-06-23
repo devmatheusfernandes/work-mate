@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { Note } from "@/modules/notes/notes.schema";
 import { useRouter } from "next/navigation";
-import { FileText, MoreVertical, Pin, Lock, ListChecks } from "lucide-react";
+import { FileText, MoreVertical, Pin, Lock } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { deleteNoteAction, updateNoteAction } from "@/modules/notes/notes.actions";
@@ -155,30 +155,29 @@ export function NoteCard({
                 <MoreVertical className="size-4" />
               </button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-44">
-              <DropdownMenuItem onClick={onToggleSelect}>
+            <DropdownMenuContent className="w-full">
+              <DropdownMenuItem className="items-center flex flex-col justify-center" onClick={onToggleSelect}>
                 {isSelected ? "Desmarcar" : "Selecionar"}
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={handleTogglePin}>
+              <DropdownMenuItem className="items-center flex flex-col justify-center" onClick={handleTogglePin}>
                 {note.pinned ? "Desafixar" : "Fixar"}
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={handleToggleLock}>
+              <DropdownMenuItem className="items-center flex flex-col justify-center" onClick={handleToggleLock}>
                 {note.isLocked ? "Destrancar" : "Trancar"}
               </DropdownMenuItem>
               <DropdownMenuSeparator />
-              <DropdownMenuItem
+              <DropdownMenuItem className="items-center flex flex-col justify-center"
                 onClick={(e) => {
                   e.stopPropagation();
                   setTaskVaultOpen(true);
                 }}
               >
-                <ListChecks className="size-4 mr-2" />
                 Transformar em task
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem
                 onClick={handleDelete}
-                className="text-destructive focus:text-destructive focus:bg-destructive/10"
+                className="items-center flex flex-col justify-center text-destructive focus:text-destructive focus:bg-destructive/10"
               >
                 Excluir
               </DropdownMenuItem>
