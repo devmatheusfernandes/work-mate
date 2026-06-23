@@ -1,6 +1,122 @@
 import { notesRepository } from "./notes.repository";
 import { Note, Folder, Tag, CreateNoteDTO, CreateFolderDTO, CreateTagDTO } from "./notes.schema";
 
+function extractSubtasksFromHtml(content: unknown): { id: string; title: string; completed: boolean }[] {
+  if (!content || typeof content !== "string") return [];
+
+  const subtasks: { id: string; title: string; completed: boolean }[] = [];
+  const seenTitles = new Set<string>();
+
+  // 1. Try to extract Tiptap HTML task items
+  const liRegex = /<li\s+([^>]*data-type="taskItem"[^>]*|[^>]*data-checked=[^>]*?)>([\s\S]*?)<\/li>/gi;
+  let match;
+  while ((match = liRegex.exec(content)) !== null) {
+    const openingTag = match[1];
+    const innerHtml = match[2];
+    
+    const completed = /data-checked="true"/i.test(openingTag);
+    const cleanHtml = innerHtml.replace(/<label>[\s\S]*?<\/label>/gi, "");
+    const title = cleanHtml.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
+    
+    if (title && !seenTitles.has(title)) {
+      seenTitles.add(title);
+      subtasks.push({
+        id: "sub_" + Math.random().toString(36).substring(2, 9),
+        title,
+        completed,
+      });
+    }
+  }
+
+  // 2. If no Tiptap task list items were found, look for plain text [ ] or [x] formats
+  if (subtasks.length === 0) {
+    const textLines = content
+      .replace(/<\/p>|<\/li>|<\/div>|<br\s*\/?>/gi, "\n")
+      .replace(/<[^>]*>/g, "")
+      .split("\n");
+
+    for (let line of textLines) {
+      line = line.trim();
+      const textTaskRegex = /^\[([ xX]?)\]\s*(.+)$/;
+      const textMatch = line.match(textTaskRegex);
+      if (textMatch) {
+        const completed = textMatch[1].toLowerCase() === "x";
+        const title = textMatch[2].trim();
+        if (title && !seenTitles.has(title)) {
+          seenTitles.add(title);
+          subtasks.push({
+            id: "sub_" + Math.random().toString(36).substring(2, 9),
+            title,
+            completed,
+          });
+        }
+      }
+    }
+  }
+
+  return subtasks;
+}
+
+function syncHtmlWithSubtasks(content: string | null | undefined, subtasks: { title: string; completed: boolean }[]): string {
+  const currentContent = content || "";
+  if (!subtasks || subtasks.length === 0) return currentContent;
+
+  const foundTitles = new Set<string>();
+  const liRegex = /<li\s+([^>]*data-type="taskItem"[^>]*|[^>]*data-checked=[^>]*?)>([\s\S]*?)<\/li>/gi;
+  
+  let syncedContent = currentContent.replace(liRegex, (match, openingTag, innerHtml) => {
+    const cleanHtml = innerHtml.replace(/<label>[\s\S]*?<\/label>/gi, "");
+    const title = cleanHtml.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
+    
+    if (!title) return match;
+    
+    const matchingSubtask = subtasks.find(
+      (s) => s.title.trim().toLowerCase() === title.toLowerCase()
+    );
+    
+    if (matchingSubtask) {
+      foundTitles.add(matchingSubtask.title.trim().toLowerCase());
+      let newOpeningTag = openingTag;
+      if (/data-checked="(true|false)"/i.test(openingTag)) {
+        newOpeningTag = openingTag.replace(
+          /data-checked="(true|false)"/i,
+          `data-checked="${matchingSubtask.completed}"`
+        );
+      } else {
+        newOpeningTag = `${openingTag} data-checked="${matchingSubtask.completed}"`;
+      }
+      return `<li ${newOpeningTag}>${innerHtml}</li>`;
+    }
+    
+    return match;
+  });
+
+  const newSubtasks = subtasks.filter(
+    (s) => !foundTitles.has(s.title.trim().toLowerCase())
+  );
+
+  if (newSubtasks.length > 0) {
+    const newLisHtml = newSubtasks
+      .map((s) => {
+        return `<li data-checked="${s.completed}" data-type="taskItem"><label><input type="checkbox"><span></span></label><div><p>${s.title}</p></div></li>`;
+      })
+      .join("");
+
+    const ulRegex = /<ul\s+[^>]*data-type="taskList"[^>]*>([\s\S]*?)<\/ul>/i;
+    if (ulRegex.test(syncedContent)) {
+      syncedContent = syncedContent.replace(
+        /(<ul\s+[^>]*data-type="taskList"[^>]*>)([\s\S]*?)(<\/ul>)/i,
+        `$1$2${newLisHtml}$3`
+      );
+    } else {
+      syncedContent = syncedContent.trim();
+      syncedContent += `<ul data-type="taskList">${newLisHtml}</ul>`;
+    }
+  }
+
+  return syncedContent;
+}
+
 export const notesService = {
   // --- Notes Services ---
   async getNotes(userId: string): Promise<Note[]> {
@@ -43,7 +159,9 @@ export const notesService = {
       isLocked: data.isLocked || false,
       taskStatus: data.taskStatus || null,
       taskDeadline: data.taskDeadline || null,
-      taskSubtasks: data.taskSubtasks || [],
+      taskSubtasks: data.taskSubtasks && data.taskSubtasks.length > 0
+        ? data.taskSubtasks
+        : (data.type === "task" ? extractSubtasksFromHtml(data.content) : []),
       taskShouldNotify: data.taskShouldNotify || false,
     };
     
@@ -59,6 +177,38 @@ export const notesService = {
     // Auto-update plain text search if content is updated
     if (data.content !== undefined && typeof data.content === "string") {
       data.searchText = data.content.replace(/<[^>]*>/g, " ").trim();
+    }
+
+    // Auto-extract subtasks when converting a note to a task
+    if (data.type === "task" && note.type !== "task") {
+      const contentToParse = data.content !== undefined ? data.content : note.content;
+      const extractedSubtasks = extractSubtasksFromHtml(contentToParse);
+      if (extractedSubtasks.length > 0) {
+        data.taskSubtasks = extractedSubtasks;
+      }
+    }
+
+    // Sincronizar subtasks de volta para o texto (TipTap) ao converter Tarefa ➔ Nota (evita perda de subtasks criadas no painel)
+    if (data.type === "note" && note.type === "task") {
+      const contentToSync = data.content !== undefined ? data.content : note.content;
+      data.content = syncHtmlWithSubtasks(contentToSync, note.taskSubtasks || []);
+      if (typeof data.content === "string") {
+        data.searchText = data.content.replace(/<[^>]*>/g, " ").trim();
+      }
+    }
+
+    // Sincronizar automaticamente o estado das subtasks no conteúdo HTML (TipTap) ao salvar a tarefa
+    const isCurrentlyTask = data.type === "task" || (note.type === "task" && data.type === undefined);
+    if (isCurrentlyTask) {
+      if (data.taskSubtasks !== undefined) {
+        const contentToSync = data.content !== undefined ? data.content : note.content;
+        data.content = syncHtmlWithSubtasks(contentToSync, data.taskSubtasks);
+        if (typeof data.content === "string") {
+          data.searchText = data.content.replace(/<[^>]*>/g, " ").trim();
+        }
+      } else if (data.content !== undefined && typeof data.content === "string") {
+        data.taskSubtasks = extractSubtasksFromHtml(data.content);
+      }
     }
     
     return notesRepository.updateNote(userId, id, data);

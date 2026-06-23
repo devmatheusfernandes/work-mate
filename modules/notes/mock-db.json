@@ -69,21 +69,47 @@
       "userId": "user_matheus",
       "id": "note_9cyj50ake",
       "title": "Nova Nota",
-      "content": null,
-      "searchText": null,
+      "content": "<ul data-type=\"taskList\"><li data-checked=\"true\" data-type=\"taskItem\"><label><input type=\"checkbox\" checked=\"checked\"><span></span></label><div><p>dfasdfasd</p></div></li><li data-checked=\"true\" data-type=\"taskItem\"><label><input type=\"checkbox\" checked=\"checked\"><span></span></label><div><p>fsd</p></div></li><li data-checked=\"false\" data-type=\"taskItem\"><label><input type=\"checkbox\"><span></span></label><div><p>f</p></div></li><li data-checked=\"false\" data-type=\"taskItem\"><label><input type=\"checkbox\"><span></span></label><div><p>asd</p></div></li><li data-checked=\"true\" data-type=\"taskItem\"><label><input type=\"checkbox\" checked=\"checked\"><span></span></label><div><p>fas</p></div></li></ul><p></p>",
+      "searchText": "dfasdfasd           fsd           f           asd           fas",
       "tagIds": [],
       "folderId": null,
       "archived": false,
       "trashed": false,
       "pinned": false,
       "createdAt": "2026-06-23T13:47:21.265Z",
-      "updatedAt": "2026-06-23T13:47:21.265Z",
-      "type": "note",
+      "updatedAt": "2026-06-23T14:36:17.947Z",
+      "type": "task",
       "fileUrl": null,
       "isLocked": false,
-      "taskStatus": null,
+      "taskStatus": "in_progress",
       "taskDeadline": null,
-      "taskSubtasks": [],
+      "taskSubtasks": [
+        {
+          "id": "sub_xvfuk0s",
+          "title": "dfasdfasd",
+          "completed": true
+        },
+        {
+          "id": "sub_znbzavg",
+          "title": "fsd",
+          "completed": true
+        },
+        {
+          "id": "sub_ft0zv1k",
+          "title": "f",
+          "completed": false
+        },
+        {
+          "id": "sub_thugsx1",
+          "title": "asd",
+          "completed": false
+        },
+        {
+          "id": "sub_zktv3ib",
+          "title": "fas",
+          "completed": true
+        }
+      ],
       "taskShouldNotify": false
     },
     {
@@ -233,8 +259,8 @@
       "userId": "user_matheus",
       "id": "note_task_docs",
       "title": "Documentar arquitetura do projeto",
-      "content": "<p>Criar diagrama C4 e documentar as camadas Service/Repository/Action com exemplos práticos.</p>",
-      "searchText": "Criar diagrama C4 e documentar as camadas Service/Repository/Action com exemplos práticos.",
+      "content": "<p>Criar diagrama C4 e documentar as camadas Service/Repository/Action com exemplos práticos.</p><ul data-type=\"taskList\"><li data-checked=\"true\" data-type=\"taskItem\"><label><input type=\"checkbox\" checked=\"checked\"><span></span></label><div><p>Diagrama C4</p></div></li><li data-checked=\"true\" data-type=\"taskItem\"><label><input type=\"checkbox\" checked=\"checked\"><span></span></label><div><p>Documentar Service layer</p></div></li></ul><p></p>",
+      "searchText": "Criar diagrama C4 e documentar as camadas Service/Repository/Action com exemplos práticos.          Diagrama C4           Documentar Service layer",
       "tagIds": [
         "tag_trabalho"
       ],
@@ -243,24 +269,13 @@
       "trashed": false,
       "pinned": false,
       "createdAt": "2026-06-22T16:00:00.000Z",
-      "updatedAt": "2026-06-23T02:53:05.124Z",
-      "type": "task",
+      "updatedAt": "2026-06-23T14:37:57.813Z",
+      "type": "note",
       "fileUrl": null,
       "isLocked": false,
-      "taskStatus": "in_progress",
-      "taskDeadline": "2026-06-20T23:59:00.000Z",
-      "taskSubtasks": [
-        {
-          "id": "sub_6",
-          "title": "Diagrama C4",
-          "completed": true
-        },
-        {
-          "id": "sub_7",
-          "title": "Documentar Service layer",
-          "completed": true
-        }
-      ],
+      "taskStatus": null,
+      "taskDeadline": null,
+      "taskSubtasks": [],
       "taskShouldNotify": false
     },
     {
