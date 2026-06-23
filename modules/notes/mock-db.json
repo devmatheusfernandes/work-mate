@@ -197,29 +197,6 @@
     },
     {
       "userId": "user_matheus",
-      "id": "note_task_api",
-      "title": "Implementar endpoints da API REST",
-      "content": "<p>Criar os endpoints de CRUD para o módulo de usuários, incluindo autenticação JWT e validação de payloads com Zod.</p>",
-      "searchText": "Criar os endpoints de CRUD para o módulo de usuários, incluindo autenticação JWT e validação de payloads com Zod.",
-      "tagIds": [
-        "tag_trabalho"
-      ],
-      "folderId": "folder_design",
-      "archived": true,
-      "trashed": false,
-      "pinned": false,
-      "createdAt": "2026-06-22T18:00:00.000Z",
-      "updatedAt": "2026-06-23T03:00:04.944Z",
-      "type": "note",
-      "fileUrl": null,
-      "isLocked": false,
-      "taskStatus": null,
-      "taskDeadline": null,
-      "taskSubtasks": [],
-      "taskShouldNotify": false
-    },
-    {
-      "userId": "user_matheus",
       "id": "note_task_design",
       "title": "Redesign da página de login",
       "content": "<p>Aplicar o novo design system com glassmorphism e gradientes sutis. Garantir acessibilidade WCAG 2.1 AA.</p>",

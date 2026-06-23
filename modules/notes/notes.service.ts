@@ -167,4 +167,21 @@ export const notesService = {
   async deleteTag(userId: string, id: string): Promise<boolean> {
     return notesRepository.deleteTag(userId, id);
   },
+
+  async emptyTrash(userId: string): Promise<boolean> {
+    const notes = await notesRepository.getNotesByUser(userId);
+    const folders = await notesRepository.getFoldersByUser(userId);
+    
+    const trashedNotes = notes.filter((n) => n.trashed);
+    const trashedFolders = folders.filter((f) => f.trashed);
+    
+    for (const note of trashedNotes) {
+      await notesRepository.deleteNote(userId, note.id);
+    }
+    for (const folder of trashedFolders) {
+      await notesRepository.deleteFolder(userId, folder.id);
+    }
+    
+    return true;
+  },
 };

@@ -1,6 +1,6 @@
 "use client";
 
-import { Trash2, Archive, X } from "lucide-react";
+import { Trash2, Archive, X, RotateCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 interface SelectionActionBarProps {
@@ -9,6 +9,7 @@ interface SelectionActionBarProps {
   onClear: () => void;
   onDelete: () => void;
   onArchive: () => void;
+  mode?: "normal" | "archive" | "trash";
 }
 
 export function SelectionActionBar({
@@ -17,10 +18,46 @@ export function SelectionActionBar({
   onClear,
   onDelete,
   onArchive,
+  mode = "normal",
 }: SelectionActionBarProps) {
   const totalSelected = selectedNoteIds.size + selectedFolderIds.size;
 
   if (totalSelected === 0) return null;
+
+  const getAction1Text = () => {
+    switch (mode) {
+      case "archive":
+        return "Desarquivar";
+      case "trash":
+        return "Restaurar";
+      case "normal":
+      default:
+        return "Arquivar";
+    }
+  };
+
+  const getAction1Icon = () => {
+    switch (mode) {
+      case "archive":
+      case "trash":
+        return <RotateCcw className="size-3.5 mr-2" />;
+      case "normal":
+      default:
+        return <Archive className="size-3.5 mr-2" />;
+    }
+  };
+
+  const getAction2Text = () => {
+    switch (mode) {
+      case "trash":
+        return "Excluir permanentemente";
+      case "archive":
+        return "Mover para Lixeira";
+      case "normal":
+      default:
+        return "Excluir";
+    }
+  };
 
   return (
     <div className="fixed bottom-22 inset-x-0 z-40 px-4 pointer-events-none animate-in fade-in slide-in-from-bottom-4 duration-300">
@@ -38,8 +75,8 @@ export function SelectionActionBar({
             onClick={onArchive}
             className="h-8 gap-1.5 text-xs text-muted-foreground hover:text-foreground cursor-pointer px-2"
           >
-            <Archive className="size-3.5 mr-2" />
-            <span>Arquivar</span>
+            {getAction1Icon()}
+            <span>{getAction1Text()}</span>
           </Button>
 
           <Button
@@ -49,7 +86,7 @@ export function SelectionActionBar({
             className="h-8 gap-1.5 text-xs text-destructive hover:text-destructive/90 cursor-pointer px-2"
           >
             <Trash2 className="size-3.5 mr-2" />
-            <span>Excluir</span>
+            <span>{getAction2Text()}</span>
           </Button>
 
           <div className="h-5 w-px bg-border/60 mx-0.5" />

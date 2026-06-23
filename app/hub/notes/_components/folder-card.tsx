@@ -1,5 +1,3 @@
-"use client";
-
 import { useState } from "react";
 import { Folder } from "@/modules/notes/notes.schema";
 import { useRouter } from "next/navigation";
@@ -21,6 +19,7 @@ interface FolderCardProps {
   isSelected: boolean;
   onToggleSelect: () => void;
   isSelectionActive: boolean;
+  mode?: "normal" | "archive" | "trash";
 }
 
 export function FolderCard({
@@ -28,6 +27,7 @@ export function FolderCard({
   isSelected,
   onToggleSelect,
   isSelectionActive,
+  mode = "normal",
 }: FolderCardProps) {
   const router = useRouter();
   const [isDragOver, setIsDragOver] = useState(false);
@@ -47,6 +47,14 @@ export function FolderCard({
       return;
     }
 
+    // In trash or archive, do not navigate directly
+    if (mode !== "normal") {
+      e.preventDefault();
+      e.stopPropagation();
+      onToggleSelect();
+      return;
+    }
+
     router.push(`/hub/notes/folder/${folder.id}`);
   };
 
@@ -63,13 +71,13 @@ export function FolderCard({
     }
   };
 
-  const handleDelete = async (e: React.MouseEvent) => {
+  const handleSoftDelete = async (e: React.MouseEvent) => {
     e.stopPropagation();
-    const toastId = toast.loading("Excluindo pasta...");
+    const toastId = toast.loading("Enviando para a lixeira...");
     try {
-      const res = await deleteFolderAction({ id: folder.id });
+      const res = await updateFolderAction({ id: folder.id, updates: { trashed: true, archived: false } });
       if (res?.data?.success) {
-        toast.success("Pasta excluída com sucesso!", { id: toastId });
+        toast.success("Pasta enviada para a lixeira!", { id: toastId });
       } else {
         toast.error("Erro ao excluir pasta.", { id: toastId });
       }
@@ -78,13 +86,78 @@ export function FolderCard({
     }
   };
 
+  const handleArchive = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    const toastId = toast.loading("Arquivando pasta...");
+    try {
+      const res = await updateFolderAction({ id: folder.id, updates: { archived: true, trashed: false } });
+      if (res?.data?.success) {
+        toast.success("Pasta arquivada!", { id: toastId });
+      } else {
+        toast.error("Erro ao arquivar pasta.", { id: toastId });
+      }
+    } catch {
+      toast.error("Erro ao arquivar pasta.", { id: toastId });
+    }
+  };
+
+  const handleUnarchive = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    const toastId = toast.loading("Desarquivando pasta...");
+    try {
+      const res = await updateFolderAction({ id: folder.id, updates: { archived: false } });
+      if (res?.data?.success) {
+        toast.success("Pasta desarquivada!", { id: toastId });
+      } else {
+        toast.error("Erro ao desarquivar pasta.", { id: toastId });
+      }
+    } catch {
+      toast.error("Erro ao desarquivar pasta.", { id: toastId });
+    }
+  };
+
+  const handleRestore = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    const toastId = toast.loading("Restaurando pasta...");
+    try {
+      const res = await updateFolderAction({ id: folder.id, updates: { trashed: false, archived: false } });
+      if (res?.data?.success) {
+        toast.success("Pasta restaurada!", { id: toastId });
+      } else {
+        toast.error("Erro ao restaurar pasta.", { id: toastId });
+      }
+    } catch {
+      toast.error("Erro ao restaurar pasta.", { id: toastId });
+    }
+  };
+
+  const handlePermanentDelete = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    const toastId = toast.loading("Excluindo permanentemente...");
+    try {
+      const res = await deleteFolderAction({ id: folder.id });
+      if (res?.data?.success) {
+        toast.success("Pasta excluída permanentemente!", { id: toastId });
+      } else {
+        toast.error("Erro ao excluir pasta permanentemente.", { id: toastId });
+      }
+    } catch {
+      toast.error("Erro ao excluir pasta permanentemente.", { id: toastId });
+    }
+  };
+
   // Drag start handler (this folder can be dragged into another folder)
   const handleDragStart = (e: React.DragEvent) => {
+    if (mode !== "normal") {
+      e.preventDefault();
+      return;
+    }
     e.dataTransfer.setData("text/plain", `folder:${folder.id}`);
   };
 
   // Droppable handlers (items can be dropped into this folder)
   const handleDragOver = (e: React.DragEvent) => {
+    if (mode !== "normal") return;
     e.preventDefault();
     setIsDragOver(true);
   };
@@ -94,6 +167,7 @@ export function FolderCard({
   };
 
   const handleDrop = async (e: React.DragEvent) => {
+    if (mode !== "normal") return;
     e.preventDefault();
     setIsDragOver(false);
     const data = e.dataTransfer.getData("text/plain");
@@ -147,7 +221,7 @@ export function FolderCard({
 
   return (
     <article
-      draggable
+      draggable={mode === "normal"}
       onDragStart={handleDragStart}
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
@@ -211,16 +285,57 @@ export function FolderCard({
             <DropdownMenuItem onClick={onToggleSelect}>
               {isSelected ? "Desmarcar" : "Selecionar"}
             </DropdownMenuItem>
-            <DropdownMenuItem onClick={handleToggleLock}>
-              {folder.isLocked ? "Destrancar" : "Trancar"}
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem
-              onClick={handleDelete}
-              className="text-destructive focus:text-destructive focus:bg-destructive/10"
-            >
-              Excluir
-            </DropdownMenuItem>
+
+            {mode === "normal" && (
+              <>
+                <DropdownMenuItem onClick={handleToggleLock}>
+                  {folder.isLocked ? "Destrancar" : "Trancar"}
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={handleArchive}>
+                  Arquivar
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  onClick={handleSoftDelete}
+                  className="text-destructive focus:text-destructive focus:bg-destructive/10"
+                >
+                  Excluir
+                </DropdownMenuItem>
+              </>
+            )}
+
+            {mode === "archive" && (
+              <>
+                <DropdownMenuItem onClick={handleUnarchive}>
+                  Desarquivar
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={handleToggleLock}>
+                  {folder.isLocked ? "Destrancar" : "Trancar"}
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  onClick={handleSoftDelete}
+                  className="text-destructive focus:text-destructive focus:bg-destructive/10"
+                >
+                  Mover para Lixeira
+                </DropdownMenuItem>
+              </>
+            )}
+
+            {mode === "trash" && (
+              <>
+                <DropdownMenuItem onClick={handleRestore}>
+                  Restaurar
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  onClick={handlePermanentDelete}
+                  className="text-destructive focus:text-destructive focus:bg-destructive/10"
+                >
+                  Excluir permanentemente
+                </DropdownMenuItem>
+              </>
+            )}
           </DropdownMenuContent>
         </DropdownMenu>
       </div>

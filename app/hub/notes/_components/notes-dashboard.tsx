@@ -12,7 +12,7 @@ import { TasksSidebar } from "./tasks-sidebar";
 import { Empty, EmptyHeader, EmptyMedia, EmptyTitle, EmptyDescription, EmptyResults } from "@/components/ui/empty";
 import { FileText, KanbanSquare } from "lucide-react";
 import { toast } from "sonner";
-import { deleteNoteAction, deleteFolderAction, updateNoteAction, updateFolderAction } from "@/modules/notes/notes.actions";
+import { updateNoteAction, updateFolderAction } from "@/modules/notes/notes.actions";
 import { useDevice } from "@/hooks/ui/use-device";
 import { SearchBar } from "@/components/ui/search-bar";
 
@@ -134,22 +134,22 @@ export function NotesDashboard({
   // Bulk Mutators
   const handleBulkDelete = async () => {
     const totalCount = selectedNoteIds.size + selectedFolderIds.size;
-    const toastId = toast.loading(`Excluindo ${totalCount} itens...`);
+    const toastId = toast.loading(`Enviando ${totalCount} itens para a lixeira...`);
 
     try {
-      // Delete selected notes
+      // Move selected notes to trash
       for (const id of Array.from(selectedNoteIds)) {
-        await deleteNoteAction({ id });
+        await updateNoteAction({ id, updates: { trashed: true, archived: false } });
       }
-      // Delete selected folders
+      // Move selected folders to trash
       for (const id of Array.from(selectedFolderIds)) {
-        await deleteFolderAction({ id });
+        await updateFolderAction({ id, updates: { trashed: true, archived: false } });
       }
 
-      toast.success("Itens excluídos com sucesso!", { id: toastId });
+      toast.success("Itens enviados para a lixeira!", { id: toastId });
       handleClearSelection();
     } catch {
-      toast.error("Erro ao excluir alguns itens.", { id: toastId });
+      toast.error("Erro ao enviar alguns itens para a lixeira.", { id: toastId });
     }
   };
 

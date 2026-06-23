@@ -128,3 +128,11 @@ export const deleteTagAction = protectedAction
     revalidatePath("/hub/notes");
     return { success: true };
   });
+
+export const emptyTrashAction = protectedAction
+  .schema(z.object({}))
+  .action(async ({ ctx }) => {
+    await notesService.emptyTrash(ctx.user.id);
+    revalidatePath("/hub/notes");
+    return { success: true };
+  });

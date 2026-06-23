@@ -22,6 +22,7 @@ interface NoteCardProps {
   isSelected: boolean;
   onToggleSelect: () => void;
   isSelectionActive: boolean;
+  mode?: "normal" | "archive" | "trash";
 }
 
 export function NoteCard({
@@ -29,6 +30,7 @@ export function NoteCard({
   isSelected,
   onToggleSelect,
   isSelectionActive,
+  mode = "normal",
 }: NoteCardProps) {
   const router = useRouter();
   const [taskVaultOpen, setTaskVaultOpen] = useState(false);
@@ -45,6 +47,14 @@ export function NoteCard({
       e.preventDefault();
       e.stopPropagation();
       toast.info("Esta nota está protegida por senha.");
+      return;
+    }
+
+    // In trash or archive, do not open details editor directly
+    if (mode !== "normal") {
+      e.preventDefault();
+      e.stopPropagation();
+      onToggleSelect();
       return;
     }
 
@@ -77,13 +87,13 @@ export function NoteCard({
     }
   };
 
-  const handleDelete = async (e: React.MouseEvent) => {
+  const handleSoftDelete = async (e: React.MouseEvent) => {
     e.stopPropagation();
-    const toastId = toast.loading("Excluindo nota...");
+    const toastId = toast.loading("Enviando para a lixeira...");
     try {
-      const res = await deleteNoteAction({ id: note.id });
+      const res = await updateNoteAction({ id: note.id, updates: { trashed: true, archived: false } });
       if (res?.data?.success) {
-        toast.success("Nota excluída com sucesso!", { id: toastId });
+        toast.success("Nota enviada para a lixeira!", { id: toastId });
       } else {
         toast.error("Erro ao excluir nota.", { id: toastId });
       }
@@ -92,8 +102,72 @@ export function NoteCard({
     }
   };
 
+  const handleArchive = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    const toastId = toast.loading("Arquivando nota...");
+    try {
+      const res = await updateNoteAction({ id: note.id, updates: { archived: true, trashed: false } });
+      if (res?.data?.success) {
+        toast.success("Nota arquivada!", { id: toastId });
+      } else {
+        toast.error("Erro ao arquivar nota.", { id: toastId });
+      }
+    } catch {
+      toast.error("Erro ao arquivar nota.", { id: toastId });
+    }
+  };
+
+  const handleUnarchive = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    const toastId = toast.loading("Desarquivando nota...");
+    try {
+      const res = await updateNoteAction({ id: note.id, updates: { archived: false } });
+      if (res?.data?.success) {
+        toast.success("Nota desarquivada!", { id: toastId });
+      } else {
+        toast.error("Erro ao desarquivar nota.", { id: toastId });
+      }
+    } catch {
+      toast.error("Erro ao desarquivar nota.", { id: toastId });
+    }
+  };
+
+  const handleRestore = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    const toastId = toast.loading("Restaurando nota...");
+    try {
+      const res = await updateNoteAction({ id: note.id, updates: { trashed: false, archived: false } });
+      if (res?.data?.success) {
+        toast.success("Nota restaurada!", { id: toastId });
+      } else {
+        toast.error("Erro ao restaurar nota.", { id: toastId });
+      }
+    } catch {
+      toast.error("Erro ao restaurar nota.", { id: toastId });
+    }
+  };
+
+  const handlePermanentDelete = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    const toastId = toast.loading("Excluindo permanentemente...");
+    try {
+      const res = await deleteNoteAction({ id: note.id });
+      if (res?.data?.success) {
+        toast.success("Nota excluída permanentemente!", { id: toastId });
+      } else {
+        toast.error("Erro ao excluir nota permanentemente.", { id: toastId });
+      }
+    } catch {
+      toast.error("Erro ao excluir nota permanentemente.", { id: toastId });
+    }
+  };
+
   // Drag and drop handlers
   const handleDragStart = (e: React.DragEvent) => {
+    if (mode !== "normal") {
+      e.preventDefault();
+      return;
+    }
     e.dataTransfer.setData("text/plain", `note:${note.id}`);
   };
 
@@ -103,7 +177,7 @@ export function NoteCard({
   return (
     <>
     <article
-      draggable
+      draggable={mode === "normal"}
       onDragStart={handleDragStart}
       onClick={handleClick}
       className={cn(
@@ -159,28 +233,69 @@ export function NoteCard({
               <DropdownMenuItem className="items-center flex flex-col justify-center" onClick={onToggleSelect}>
                 {isSelected ? "Desmarcar" : "Selecionar"}
               </DropdownMenuItem>
-              <DropdownMenuItem className="items-center flex flex-col justify-center" onClick={handleTogglePin}>
-                {note.pinned ? "Desafixar" : "Fixar"}
-              </DropdownMenuItem>
-              <DropdownMenuItem className="items-center flex flex-col justify-center" onClick={handleToggleLock}>
-                {note.isLocked ? "Destrancar" : "Trancar"}
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem className="items-center flex flex-col justify-center"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setTaskVaultOpen(true);
-                }}
-              >
-                Transformar em task
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem
-                onClick={handleDelete}
-                className="items-center flex flex-col justify-center text-destructive focus:text-destructive focus:bg-destructive/10"
-              >
-                Excluir
-              </DropdownMenuItem>
+
+              {mode === "normal" && (
+                <>
+                  <DropdownMenuItem className="items-center flex flex-col justify-center" onClick={handleTogglePin}>
+                    {note.pinned ? "Desafixar" : "Fixar"}
+                  </DropdownMenuItem>
+                  <DropdownMenuItem className="items-center flex flex-col justify-center" onClick={handleToggleLock}>
+                    {note.isLocked ? "Destrancar" : "Trancar"}
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem className="items-center flex flex-col justify-center"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setTaskVaultOpen(true);
+                    }}
+                  >
+                    Transformar em task
+                  </DropdownMenuItem>
+                  <DropdownMenuItem className="items-center flex flex-col justify-center" onClick={handleArchive}>
+                    Arquivar
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    onClick={handleSoftDelete}
+                    className="items-center flex flex-col justify-center text-destructive focus:text-destructive focus:bg-destructive/10"
+                  >
+                    Excluir
+                  </DropdownMenuItem>
+                </>
+              )}
+
+              {mode === "archive" && (
+                <>
+                  <DropdownMenuItem className="items-center flex flex-col justify-center" onClick={handleUnarchive}>
+                    Desarquivar
+                  </DropdownMenuItem>
+                  <DropdownMenuItem className="items-center flex flex-col justify-center" onClick={handleToggleLock}>
+                    {note.isLocked ? "Destrancar" : "Trancar"}
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    onClick={handleSoftDelete}
+                    className="items-center flex flex-col justify-center text-destructive focus:text-destructive focus:bg-destructive/10"
+                  >
+                    Mover para Lixeira
+                  </DropdownMenuItem>
+                </>
+              )}
+
+              {mode === "trash" && (
+                <>
+                  <DropdownMenuItem className="items-center flex flex-col justify-center" onClick={handleRestore}>
+                    Restaurar
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    onClick={handlePermanentDelete}
+                    className="items-center flex flex-col justify-center text-destructive focus:text-destructive focus:bg-destructive/10"
+                  >
+                    Excluir permanentemente
+                  </DropdownMenuItem>
+                </>
+              )}
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
