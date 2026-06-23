@@ -2,10 +2,11 @@
 
 import { useState, useRef, ChangeEvent, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { Plus, FolderPlus, Tag as TagIcon, FilePlus, FileText, Loader2, Trash2 } from "lucide-react";
+import { Plus, FolderPlus, Tag as TagIcon, FilePlus, FileText, Loader2, Trash2, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { motion, AnimatePresence, useSpring, useTransform } from "framer-motion";
+import { useChatStore } from "@/modules/chat/chat.store";
 import {
   createNoteAction,
   createFolderAction,
@@ -69,6 +70,12 @@ const menuItems = [
     gradient: "from-orange-500 to-amber-500",
     Icon: FileText,
   },
+  {
+    key: "chat",
+    label: "Assistente IA",
+    gradient: "from-pink-500 to-rose-500",
+    Icon: Sparkles,
+  },
 ] as const;
 
 type MenuKey = typeof menuItems[number]["key"];
@@ -119,6 +126,7 @@ const itemVariants = {
 
 export function CreateButton({ activeFolderId, tags }: CreateButtonProps) {
   const router = useRouter();
+  const setSidebarOpen = useChatStore((state) => state.setSidebarOpen);
   const [isOpenMenu, setIsOpenMenu] = useState(false);
   const [activeVault, setActiveVault] = useState<"folder" | "tag" | null>(null);
 
@@ -309,6 +317,10 @@ export function CreateButton({ activeFolderId, tags }: CreateButtonProps) {
         break;
       case "pdf":
         fileInputRef.current?.click();
+        break;
+      case "chat":
+        setIsOpenMenu(false);
+        setSidebarOpen(true);
         break;
     }
   };
