@@ -2,7 +2,7 @@
 
 import { useState, useRef, ChangeEvent, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { Plus, FolderPlus, Tag as TagIcon, FilePlus, FileText, Loader2, Trash2, Sparkles } from "lucide-react";
+import { Plus, FolderPlus, Tag as TagIcon, FilePlus, FileText, Loader2, Trash2, Sparkles, CheckCircle2 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { motion, AnimatePresence, useSpring, useTransform } from "framer-motion";
@@ -51,6 +51,12 @@ const menuItems = [
     label: "Nova Nota",
     gradient: "from-blue-500 to-indigo-500",
     Icon: FilePlus,
+  },
+  {
+    key: "task",
+    label: "Nova Tarefa",
+    gradient: "from-amber-500 to-orange-500",
+    Icon: CheckCircle2,
   },
   {
     key: "folder",
@@ -143,8 +149,9 @@ export function CreateButton({ activeFolderId, tags }: CreateButtonProps) {
 
   // Loading states
   const [isCreatingNote, setIsCreatingNote] = useState(false);
+  const [isCreatingTask, setIsCreatingTask] = useState(false);
   const [isUploadingPdf, setIsUploadingPdf] = useState(false);
-  const isMenuBusy = isCreatingNote || isUploadingPdf;
+  const isMenuBusy = isCreatingNote || isCreatingTask || isUploadingPdf;
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -184,6 +191,37 @@ export function CreateButton({ activeFolderId, tags }: CreateButtonProps) {
       toast.error("Erro inesperado ao criar nota.", { id: toastId });
     } finally {
       setIsCreatingNote(false);
+    }
+  }, [activeFolderId, router]);
+
+  const handleCreateTask = useCallback(async () => {
+    setIsCreatingTask(true);
+    setIsOpenMenu(false);
+    const toastId = toast.loading("Criando tarefa...");
+
+    try {
+      const res = await createNoteAction({
+        title: "Nova Tarefa",
+        folderId: activeFolderId,
+        type: "task",
+        taskStatus: "to_start",
+      });
+
+      if (res?.data?.success && res.data.note) {
+        toast.success("Tarefa criada com sucesso!", { id: toastId });
+        if (window.location.pathname === "/hub/tasks") {
+          router.push(`/hub/tasks?taskId=${res.data.note.id}`);
+        } else {
+          router.push(`/hub/notes/${res.data.note.id}`);
+        }
+      } else {
+        toast.error(res?.serverError || "Erro ao criar tarefa.", { id: toastId });
+      }
+    } catch (err) {
+      console.error(err);
+      toast.error("Erro inesperado ao criar tarefa.", { id: toastId });
+    } finally {
+      setIsCreatingTask(false);
     }
   }, [activeFolderId, router]);
 
@@ -306,6 +344,9 @@ export function CreateButton({ activeFolderId, tags }: CreateButtonProps) {
     switch (key) {
       case "note":
         handleCreateNote();
+        break;
+      case "task":
+        handleCreateTask();
         break;
       case "folder":
         setIsOpenMenu(false);

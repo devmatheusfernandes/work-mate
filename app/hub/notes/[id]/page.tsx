@@ -6,6 +6,7 @@ import { FileText, Download, ArrowLeft } from "lucide-react";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 import { NoteEditorClient } from "./note-editor-client";
+import { redirect } from "next/navigation";
 
 interface NotePageProps {
   params: Promise<{
@@ -18,6 +19,9 @@ export default async function NotePage({ params }: NotePageProps) {
   const noteId = resolvedParams.id;
 
   const user = await getCurrentUser();
+  if (!user) {
+    redirect("/signin");
+  }
   const note = await notesService.getNote(user.id, noteId);
 
   const backHref = note.folderId
@@ -32,6 +36,7 @@ export default async function NotePage({ params }: NotePageProps) {
           backHref={backHref}
           showSubHeader={false}
           className="contents"
+          user={user}
         />
 
         <main className="container flex-1 py-6 flex flex-col gap-6">

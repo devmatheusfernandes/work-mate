@@ -1,4 +1,7 @@
 import { z } from "zod";
+import { pgTable, text, boolean, timestamp, jsonb, integer } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
+
 
 // --- Task Status Enum ---
 export const taskStatusEnum = z.enum(["to_start", "in_progress", "done"]);
@@ -88,6 +91,7 @@ export const noteSchema = z.object({
   updatedAt: z.string(),
   type: z.enum(["note", "pdf", "task"]).default("note"),
   fileUrl: z.string().optional().nullable(),
+  fileSize: z.number().optional().nullable(),
   isLocked: z.boolean().default(false),
   // --- Task-specific fields (only relevant when type === "task") ---
   taskStatus: taskStatusEnum.nullable().optional(),
@@ -114,3 +118,51 @@ export const createNoteSchema = noteSchema.omit({
 });
 
 export type CreateNoteDTO = z.infer<typeof createNoteSchema>;
+
+// --- Drizzle Table Schemas ---
+
+export const foldersTable = pgTable("folders", {
+  userId: text("user_id").notNull(),
+  id: text("id").primaryKey(),
+  title: text("title").notNull(),
+  parentId: text("parent_id"),
+  color: text("color"),
+  archived: boolean("archived").notNull().default(false),
+  trashed: boolean("trashed").notNull().default(false),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  isLocked: boolean("is_locked").notNull().default(false),
+});
+
+export const tagsTable = pgTable("tags", {
+  userId: text("user_id").notNull(),
+  id: text("id").primaryKey(),
+  title: text("title").notNull(),
+  color: text("color"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+export const notesTable = pgTable("notes", {
+  userId: text("user_id").notNull(),
+  id: text("id").primaryKey(),
+  title: text("title").notNull().default("Nova Nota"),
+  content: text("content"), // TipTap content (HTML or JSON string)
+  searchText: text("search_text"),
+  tagIds: text("tag_ids").array().notNull().default(sql`'{}'::text[]`),
+  folderId: text("folder_id").references(() => foldersTable.id, { onDelete: "cascade" }),
+  archived: boolean("archived").notNull().default(false),
+  trashed: boolean("trashed").notNull().default(false),
+  pinned: boolean("pinned").notNull().default(false),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  type: text("type").notNull().default("note"), // 'note' | 'pdf' | 'task'
+  fileUrl: text("file_url"),
+  fileSize: integer("file_size"),
+  isLocked: boolean("is_locked").notNull().default(false),
+  taskStatus: text("task_status"), // 'to_start' | 'in_progress' | 'done'
+  taskDeadline: text("task_deadline"), // string or timestamp
+  taskSubtasks: jsonb("task_subtasks").$type<Subtask[]>().notNull().default([]),
+  taskShouldNotify: boolean("task_should_notify").notNull().default(false),
+});
+

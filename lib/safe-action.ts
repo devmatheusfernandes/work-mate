@@ -1,13 +1,25 @@
 import { createSafeActionClient } from "next-safe-action";
 
-// Helper to simulate the current user in the session
+import { createClient } from "./supabase-server";
+
+// Helper to retrieve the actual authenticated user from the Supabase session
 export async function getCurrentUser() {
-  return {
-    id: "user_matheus",
-    name: "Matheus Fernandes",
-    email: "matheus@workmate.com.br",
-    role: "Desenvolvedor Full Stack",
-  };
+  try {
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    
+    if (!user) return null;
+
+    return {
+      id: user.id,
+      name: user.user_metadata?.name || user.email?.split("@")[0] || "Membro",
+      email: user.email || "",
+      role: "Membro",
+    };
+  } catch (error) {
+    console.error("Erro ao obter usuário atual:", error);
+    return null;
+  }
 }
 
 // Global action client

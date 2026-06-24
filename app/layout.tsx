@@ -3,6 +3,7 @@ import { Quicksand, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { ThemeProvider } from "@/components/theme-provider";
 import { ThemeColorUpdater } from "@/components/layout/theme-color-updater";
+import { Toaster } from "sonner";
 
 const quicksand = Quicksand({
   variable: "--font-sans",
@@ -39,6 +40,7 @@ export default function RootLayout({
         >
           <ThemeColorUpdater />
           {children}
+          <Toaster closeButton position="top-right" />
           <div id="vault-root" />
         </ThemeProvider>
       </body>

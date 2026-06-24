@@ -1,77 +1,176 @@
 import { create } from "zustand";
-import { ChatMessage } from "./chat.types";
+import { ChatMessage, ChatSession } from "./chat.types";
+import { 
+  getChatSessionsAction, 
+  getChatMessagesAction, 
+  createChatSessionAction, 
+  sendChatMessageAction, 
+  archiveChatSessionAction, 
+  deleteChatSessionAction 
+} from "./chat.actions";
 
 interface ChatState {
+  sessions: ChatSession[];
   messages: ChatMessage[];
+  currentSessionId: string | null;
   isSidebarOpen: boolean;
   isGenerating: boolean;
+  isLoadingSessions: boolean;
+  isLoadingMessages: boolean;
+  
   setSidebarOpen: (open: boolean) => void;
+  setCurrentSessionId: (sessionId: string | null) => Promise<void>;
+  loadSessions: (type?: "active" | "archived") => Promise<void>;
+  loadMessages: (sessionId: string) => Promise<void>;
+  createNewSession: () => Promise<string | null>;
   sendMessage: (content: string) => Promise<void>;
+  archiveSession: (sessionId: string, isArchived: boolean) => Promise<void>;
+  deleteSession: (sessionId: string) => Promise<void>;
   clearMessages: () => void;
 }
 
-// Custom responses helper based on keywords
-const getMockResponse = (input: string): string => {
-  const query = input.toLowerCase();
-  
-  if (query.includes("tarefa") || query.includes("task") || query.includes("kanban")) {
-    return "Gerenciar tarefas é fundamental para manter o foco! No WorkMate, você pode usar a aba de **Tarefas** para organizar seus estudos nas raias de *A Fazer*, *Em Progresso* e *Concluído*.\n\nAlém disso, na tela de Notas, você pode arrastar qualquer nota para a barra lateral direita para convertê-la em tarefa instantaneamente! Quer que eu te ajude a estruturar um plano de tarefas para hoje?";
-  }
-  
-  if (query.includes("nota") || query.includes("pasta") || query.includes("resumo")) {
-    return "As notas no WorkMate suportam formatação rich text via editor TipTap! Você pode organizar tudo em pastas e subpastas de forma hierárquica.\n\nExperimente adicionar tags coloridas às suas notas para facilitar a busca rápida e a filtragem no dashboard principal. Qual assunto você está estudando hoje?";
-  }
-  
-  if (query.includes("quem é você") || query.includes("ia") || query.includes("ajuda") || query.includes("gpt")) {
-    return "Eu sou o **Assistente IA do WorkMate**! 🧠✨\n\nEstou aqui para te ajudar a:\n1. Organizar seu fluxo de estudos.\n2. Tirar dúvidas conceituais rapidamente.\n3. Criar cronogramas e listar tarefas a partir dos seus resumos.\n\nBasta me enviar uma pergunta ou pedir uma sugestão!";
-  }
-
-  return "Excelente pergunta! Posso te ajudar a estruturar essas ideias. \n\nNo WorkMate, você tem acesso a:\n- 📝 **Notas estruturadas** com pastas e tags\n- 🎯 **Quadro Kanban** completo para tarefas\n- ⏰ **Notificações** para prazos importantes\n\nComo prefere começar? Posso criar um roteiro de estudos ou detalhar alguma ferramenta para você.";
-};
-
 export const useChatStore = create<ChatState>((set, get) => ({
+  sessions: [],
   messages: [],
+  currentSessionId: null,
   isSidebarOpen: false,
   isGenerating: false,
+  isLoadingSessions: false,
+  isLoadingMessages: false,
   
   setSidebarOpen: (open) => set({ isSidebarOpen: open }),
   
+  setCurrentSessionId: async (sessionId) => {
+    set({ currentSessionId: sessionId });
+    if (sessionId) {
+      await get().loadMessages(sessionId);
+    } else {
+      set({ messages: [] });
+    }
+  },
+
+  loadSessions: async (type = "active") => {
+    set({ isLoadingSessions: true });
+    try {
+      const res = await getChatSessionsAction({ type });
+      if (res?.data?.success && res.data.sessions) {
+        // Convert date strings/timestamps to Date objects
+        type RawSession = Omit<ChatSession, "createdAt" | "updatedAt"> & { createdAt: string | Date; updatedAt: string | Date };
+        const sessions = (res.data.sessions as RawSession[]).map((s) => ({
+          ...s,
+          createdAt: new Date(s.createdAt),
+          updatedAt: new Date(s.updatedAt),
+        }));
+        set({ sessions });
+      }
+    } catch (error) {
+      console.error("Erro ao carregar sessões de chat:", error);
+    } finally {
+      set({ isLoadingSessions: false });
+    }
+  },
+
+  loadMessages: async (sessionId) => {
+    set({ isLoadingMessages: true });
+    try {
+      const res = await getChatMessagesAction({ sessionId });
+      if (res?.data?.success && res.data.messages) {
+        type RawMessage = Omit<ChatMessage, "createdAt"> & { createdAt: string | Date };
+        const messages = (res.data.messages as RawMessage[]).map((m) => ({
+          ...m,
+          createdAt: new Date(m.createdAt),
+        }));
+        set({ messages });
+      }
+    } catch (error) {
+      console.error("Erro ao carregar mensagens:", error);
+    } finally {
+      set({ isLoadingMessages: false });
+    }
+  },
+
+  createNewSession: async () => {
+    try {
+      const res = await createChatSessionAction({ title: "Nova conversa" });
+      if (res?.data?.success && res.data.session) {
+        const session = res.data.session;
+        await get().loadSessions();
+        set({ currentSessionId: session.id, messages: [] });
+        return session.id;
+      }
+    } catch (error) {
+      console.error("Erro ao criar nova sessão de chat:", error);
+    }
+    return null;
+  },
+
   sendMessage: async (content: string) => {
     if (!content.trim() || get().isGenerating) return;
 
+    // Build optimistic user message
     const userMessage: ChatMessage = {
-      id: Math.random().toString(36).substring(7),
+      id: "optimistic_" + Math.random().toString(36).substring(7),
       role: "user",
       content,
       createdAt: new Date(),
+      promptTokens: null,
+      candidatesTokens: null,
+      cost: null,
+      precision: null,
     };
 
-    // 1. Optimistic UI: Add user message immediately
     set((state) => ({
       messages: [...state.messages, userMessage],
       isGenerating: true,
     }));
 
-    // 2. Prepare mock AI response content
-    const responseText = getMockResponse(content);
-    
-    // Simulate API network latency
-    await new Promise((resolve) => setTimeout(resolve, 800));
+    const assistantMessageId = "msg_placeholder_" + Math.random().toString(36).substring(7);
+    let responseText = "";
+    type RawServerMessage = Omit<ChatMessage, "createdAt" | "role"> & { createdAt: string | Date; role: string };
+    let serverMessage: RawServerMessage | null = null;
+    let actualSessionId = get().currentSessionId;
 
-    // Create placeholder message for the assistant
-    const assistantMessageId = Math.random().toString(36).substring(7);
+    try {
+      const res = await sendChatMessageAction({ 
+        sessionId: actualSessionId, 
+        content 
+      });
+
+      if (res?.data?.success && res.data.message) {
+        serverMessage = res.data.message as RawServerMessage;
+        responseText = serverMessage.content;
+        
+        // If session was auto-created, update state with the new session
+        if (!actualSessionId && res.data.sessionId) {
+          actualSessionId = res.data.sessionId;
+          set({ currentSessionId: actualSessionId });
+          await get().loadSessions();
+        }
+      } else {
+        responseText = res?.data?.error || "Desculpe, ocorreu um erro ao gerar a resposta.";
+      }
+    } catch (error) {
+      console.error("Erro ao enviar mensagem para IA:", error);
+      responseText = "Desculpe, não consegui me conectar com a Inteligência Artificial.";
+    }
+
+    // Create assistant placeholder message
     const assistantMessage: ChatMessage = {
-      id: assistantMessageId,
+      id: serverMessage?.id || assistantMessageId,
       role: "assistant",
       content: "",
-      createdAt: new Date(),
+      createdAt: serverMessage ? new Date(serverMessage.createdAt) : new Date(),
+      promptTokens: serverMessage?.promptTokens || null,
+      candidatesTokens: serverMessage?.candidatesTokens || null,
+      cost: serverMessage?.cost || null,
+      precision: serverMessage?.precision || null,
     };
 
     set((state) => ({
       messages: [...state.messages, assistantMessage],
     }));
 
-    // 3. Stream simulation: output word-by-word or character chunks
+    // Stream simulation: output word-by-word
     const words = responseText.split(" ");
     let currentText = "";
     let wordIndex = 0;
@@ -82,7 +181,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
           currentText += (wordIndex === 0 ? "" : " ") + words[wordIndex];
           set((state) => ({
             messages: state.messages.map((msg) =>
-              msg.id === assistantMessageId
+              msg.id === assistantMessage.id
                 ? { ...msg, content: currentText }
                 : msg
             ),
@@ -93,8 +192,36 @@ export const useChatStore = create<ChatState>((set, get) => ({
           set({ isGenerating: false });
           resolve();
         }
-      }, 50); // Speed of streaming words
+      }, 25); // Faster streaming for responsive feeling
     });
+  },
+
+  archiveSession: async (sessionId, isArchived) => {
+    try {
+      const res = await archiveChatSessionAction({ sessionId, isArchived });
+      if (res?.data?.success) {
+        await get().loadSessions();
+        if (get().currentSessionId === sessionId) {
+          set({ currentSessionId: null, messages: [] });
+        }
+      }
+    } catch (error) {
+      console.error("Erro ao arquivar sessão:", error);
+    }
+  },
+
+  deleteSession: async (sessionId) => {
+    try {
+      const res = await deleteChatSessionAction({ sessionId });
+      if (res?.data?.success) {
+        await get().loadSessions();
+        if (get().currentSessionId === sessionId) {
+          set({ currentSessionId: null, messages: [] });
+        }
+      }
+    } catch (error) {
+      console.error("Erro ao deletar sessão:", error);
+    }
   },
 
   clearMessages: () => set({ messages: [] }),

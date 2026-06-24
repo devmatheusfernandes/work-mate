@@ -1,5 +1,38 @@
 import { notesRepository } from "./notes.repository";
 import { Note, Folder, Tag, CreateNoteDTO, CreateFolderDTO, CreateTagDTO } from "./notes.schema";
+import { vectorService } from "../vector/vector.service";
+
+type NoteSourceType = "note" | "pdf" | "task";
+
+function getContentToEmbed(note: Note): string {
+  const bodyText = note.searchText || "";
+  let text = `Título: ${note.title}\nConteúdo: ${bodyText}`;
+  
+  if (note.type === "task") {
+    const statusLabel = 
+      note.taskStatus === "done" ? "Concluída" : 
+      note.taskStatus === "in_progress" ? "Em Progresso" : "A Fazer";
+      
+    text += `\nTipo: Tarefa\nStatus: ${statusLabel}`;
+    
+    if (note.taskSubtasks && note.taskSubtasks.length > 0) {
+      const subtaskDetails = note.taskSubtasks
+        .map(s => `- [${s.completed ? "x" : " "}] ${s.title}`)
+        .join("\n");
+      text += `\nSubtarefas:\n${subtaskDetails}`;
+    }
+    
+    if (note.taskDeadline) {
+      text += `\nPrazo: ${note.taskDeadline}`;
+    }
+  } else if (note.type === "pdf") {
+    text += `\nTipo: Documento PDF`;
+  } else {
+    text += `\nTipo: Nota de Texto`;
+  }
+  
+  return text.trim();
+}
 
 function extractSubtasksFromHtml(content: unknown): { id: string; title: string; completed: boolean }[] {
   if (!content || typeof content !== "string") return [];
@@ -156,6 +189,7 @@ export const notesService = {
       updatedAt: now,
       type: data.type || "note",
       fileUrl: data.fileUrl || null,
+      fileSize: data.fileSize || null,
       isLocked: data.isLocked || false,
       taskStatus: data.taskStatus || null,
       taskDeadline: data.taskDeadline || null,
@@ -165,7 +199,20 @@ export const notesService = {
       taskShouldNotify: data.taskShouldNotify || false,
     };
     
-    return notesRepository.createNote(userId, newNote);
+    const note = await notesRepository.createNote(userId, newNote);
+
+    // Vetoriza de forma imediata (síncrona) para manter RAG atualizado
+    if (!note.trashed) {
+      try {
+        await vectorService.embedNow(userId, note.id, note.type as NoteSourceType, getContentToEmbed(note));
+      } catch (e) {
+        console.error("Erro ao vetorizar nota síncronamente na criação:", e);
+        // Fallback: garante que fica na fila pendente
+        await vectorService.enqueue(userId, note.id, note.type as NoteSourceType, getContentToEmbed(note));
+      }
+    }
+
+    return note;
   },
 
   async updateNote(userId: string, id: string, data: Partial<Note>): Promise<Note> {
@@ -211,7 +258,22 @@ export const notesService = {
       }
     }
     
-    return notesRepository.updateNote(userId, id, data);
+    const updatedNote = await notesRepository.updateNote(userId, id, data);
+
+    // Se a nota foi para a lixeira, removemos da fila de embeddings
+    if (updatedNote.trashed) {
+      await vectorService.dequeue(updatedNote.id, updatedNote.type as NoteSourceType);
+    } else {
+      try {
+        await vectorService.embedNow(userId, updatedNote.id, updatedNote.type as NoteSourceType, getContentToEmbed(updatedNote));
+      } catch (e) {
+        console.error("Erro ao vetorizar nota síncronamente na atualização:", e);
+        // Fallback: garante que fica na fila
+        await vectorService.enqueue(userId, updatedNote.id, updatedNote.type as NoteSourceType, getContentToEmbed(updatedNote));
+      }
+    }
+
+    return updatedNote;
   },
 
   async deleteNote(userId: string, id: string): Promise<boolean> {
@@ -219,7 +281,13 @@ export const notesService = {
     if (!note) {
       throw new Error("Nota não encontrada");
     }
-    return notesRepository.deleteNote(userId, id);
+    
+    const result = await notesRepository.deleteNote(userId, id);
+    if (result) {
+      await vectorService.dequeue(id, note.type as NoteSourceType);
+    }
+    
+    return result;
   },
 
   // --- Folders Services ---
@@ -327,11 +395,22 @@ export const notesService = {
     
     for (const note of trashedNotes) {
       await notesRepository.deleteNote(userId, note.id);
+      await vectorService.dequeue(note.id, note.type as NoteSourceType);
     }
     for (const folder of trashedFolders) {
       await notesRepository.deleteFolder(userId, folder.id);
     }
     
     return true;
+  },
+
+  async embedNoteNow(userId: string, id: string): Promise<void> {
+    const note = await this.getNote(userId, id);
+    const contentToEmbed = getContentToEmbed(note);
+    await vectorService.embedNow(userId, note.id, note.type as NoteSourceType, contentToEmbed);
+  },
+
+  getFormattedContent(note: Note): string {
+    return getContentToEmbed(note);
   },
 };

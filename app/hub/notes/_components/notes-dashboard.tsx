@@ -12,7 +12,7 @@ import { TasksSidebar } from "./tasks-sidebar";
 import { Empty, EmptyHeader, EmptyMedia, EmptyTitle, EmptyDescription, EmptyResults } from "@/components/ui/empty";
 import { FileText, KanbanSquare } from "lucide-react";
 import { toast } from "sonner";
-import { updateNoteAction, updateFolderAction } from "@/modules/notes/notes.actions";
+import { updateNoteAction, updateFolderAction, embedMultipleNotesNowAction } from "@/modules/notes/notes.actions";
 import { useDevice } from "@/hooks/ui/use-device";
 import { SearchBar } from "@/components/ui/search-bar";
 
@@ -174,6 +174,25 @@ export function NotesDashboard({
     }
   };
 
+  const handleBulkEmbed = async () => {
+    const totalCount = selectedNoteIds.size;
+    if (totalCount === 0) return;
+
+    const toastId = toast.loading(`Vetorizando ${totalCount} nota(s) com Gemini...`);
+
+    try {
+      const res = await embedMultipleNotesNowAction({ ids: Array.from(selectedNoteIds) });
+      if (res?.data?.success) {
+        toast.success("Notas vetorizadas com sucesso!", { id: toastId });
+        handleClearSelection();
+      } else {
+        toast.error(res?.data?.error || "Erro ao vetorizar notas.", { id: toastId });
+      }
+    } catch {
+      toast.error("Erro ao vetorizar notas.", { id: toastId });
+    }
+  };
+
   // Handle drop on main grid area (task → note conversion)
   const handleGridDrop = async (e: React.DragEvent) => {
     e.preventDefault();
@@ -328,6 +347,7 @@ export function NotesDashboard({
           onClear={handleClearSelection}
           onDelete={handleBulkDelete}
           onArchive={handleBulkArchive}
+          onEmbed={handleBulkEmbed}
         />
 
         {/* Floating Create FAB */}

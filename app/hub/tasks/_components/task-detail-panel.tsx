@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback, useRef, useEffect } from "react";
 import { toast } from "sonner";
 import { updateNoteAction } from "@/modules/notes/notes.actions";
 import {
@@ -12,7 +12,6 @@ import {
   BellOff,
   Plus,
   Trash2,
-  Save,
   RotateCcw,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -61,10 +60,46 @@ export function TaskDetailPanel({ task, onClose }: TaskDetailPanelProps) {
   const [subtasks, setSubtasks] = useState<Subtask[]>(task.taskSubtasks || []);
   const [shouldNotify, setShouldNotify] = useState(task.taskShouldNotify || false);
   const [newSubtaskTitle, setNewSubtaskTitle] = useState("");
-  const [isSaving, setIsSaving] = useState(false);
   const contentRef = useRef<string>(
     typeof task.content === "string" ? task.content : ""
   );
+  const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  const saveField = useCallback(async (updates: Partial<Note>) => {
+    try {
+      await updateNoteAction({
+        id: task.id,
+        updates,
+      });
+    } catch (err) {
+      console.error("Erro no auto-save em segundo plano:", err);
+    }
+  }, [task.id]);
+
+  const triggerDebouncedSave = useCallback((updates: Partial<Note>) => {
+    if (saveTimeoutRef.current) {
+      clearTimeout(saveTimeoutRef.current);
+    }
+    saveTimeoutRef.current = setTimeout(async () => {
+      try {
+        await updateNoteAction({
+          id: task.id,
+          updates,
+        });
+      } catch (err) {
+        console.error("Erro no auto-save debounced do editor:", err);
+      }
+    }, 1200);
+  }, [task.id]);
+
+  // Clean up timer on unmount
+  useEffect(() => {
+    return () => {
+      if (saveTimeoutRef.current) {
+        clearTimeout(saveTimeoutRef.current);
+      }
+    };
+  }, []);
 
   // Minimal TipTap editor
   const editor = useEditor({
@@ -87,7 +122,10 @@ export function TaskDetailPanel({ task, onClose }: TaskDetailPanelProps) {
       },
     },
     onUpdate({ editor }) {
-      contentRef.current = editor.getHTML();
+      const html = editor.getHTML();
+      contentRef.current = html;
+      const searchText = html.replace(/<[^>]*>/g, " ").trim();
+      triggerDebouncedSave({ content: html, searchText });
     },
   });
 
@@ -98,54 +136,44 @@ export function TaskDetailPanel({ task, onClose }: TaskDetailPanelProps) {
       title: newSubtaskTitle.trim(),
       completed: false,
     };
-    setSubtasks((prev) => [...prev, newSub]);
+    setSubtasks((prev) => {
+      const next = [...prev, newSub];
+      saveField({ taskSubtasks: next });
+      return next;
+    });
     setNewSubtaskTitle("");
-  }, [newSubtaskTitle]);
+  }, [newSubtaskTitle, saveField]);
 
   const handleToggleSubtask = useCallback((id: string) => {
-    setSubtasks((prev) =>
-      prev.map((s) => (s.id === id ? { ...s, completed: !s.completed } : s))
-    );
-  }, []);
+    setSubtasks((prev) => {
+      const next = prev.map((s) => (s.id === id ? { ...s, completed: !s.completed } : s));
+      saveField({ taskSubtasks: next });
+      return next;
+    });
+  }, [saveField]);
 
   const handleDeleteSubtask = useCallback((id: string) => {
-    setSubtasks((prev) => prev.filter((s) => s.id !== id));
-  }, []);
+    setSubtasks((prev) => {
+      const next = prev.filter((s) => s.id !== id);
+      saveField({ taskSubtasks: next });
+      return next;
+    });
+  }, [saveField]);
 
-  const completedCount = subtasks.filter((s) => s.completed).length;
-  const progress = subtasks.length > 0 ? (completedCount / subtasks.length) * 100 : 0;
+  const handleStatusChange = (newStatus: TaskStatus) => {
+    setStatus(newStatus);
+    saveField({ taskStatus: newStatus });
+  };
 
-  const handleSave = async () => {
-    setIsSaving(true);
-    const toastId = toast.loading("Salvando tarefa...");
+  const handleDeadlineChange = (val: string) => {
+    const newDeadline = val ? new Date(val).toISOString() : "";
+    setDeadline(newDeadline);
+    saveField({ taskDeadline: newDeadline || null });
+  };
 
-    const searchText = contentRef.current
-      .replace(/<[^>]*>/g, " ")
-      .trim();
-
-    try {
-      const result = await updateNoteAction({
-        id: task.id,
-        updates: {
-          taskStatus: status,
-          taskDeadline: deadline || null,
-          taskSubtasks: subtasks,
-          taskShouldNotify: shouldNotify,
-          content: contentRef.current,
-          searchText,
-        },
-      });
-
-      if (result?.data?.success) {
-        toast.success("Tarefa salva!", { id: toastId });
-      } else {
-        toast.error("Erro ao salvar tarefa.", { id: toastId });
-      }
-    } catch {
-      toast.error("Erro ao salvar tarefa.", { id: toastId });
-    } finally {
-      setIsSaving(false);
-    }
+  const handleNotifyChange = (val: boolean) => {
+    setShouldNotify(val);
+    saveField({ taskShouldNotify: val });
   };
 
   const handleConvertToNote = async () => {
@@ -172,6 +200,9 @@ export function TaskDetailPanel({ task, onClose }: TaskDetailPanelProps) {
     }
   };
 
+  const completedCount = subtasks.filter((s) => s.completed).length;
+  const progress = subtasks.length > 0 ? (completedCount / subtasks.length) * 100 : 0;
+
   return (
     <div className="flex flex-col gap-0 h-full">
       {/* Metadata Section */}
@@ -187,7 +218,7 @@ export function TaskDetailPanel({ task, onClose }: TaskDetailPanelProps) {
               return (
                 <button
                   key={s}
-                  onClick={() => setStatus(s)}
+                  onClick={() => handleStatusChange(s)}
                   className={cn(
                     "flex items-center gap-1.5 px-2.5 py-1 rounded-lg border text-[11px] font-medium transition-all cursor-pointer",
                     status === s
@@ -213,9 +244,7 @@ export function TaskDetailPanel({ task, onClose }: TaskDetailPanelProps) {
             <input
               type="datetime-local"
               value={deadline ? deadline.slice(0, 16) : ""}
-              onChange={(e) =>
-                setDeadline(e.target.value ? new Date(e.target.value).toISOString() : "")
-              }
+              onChange={(e) => handleDeadlineChange(e.target.value)}
               className="w-full h-8 pl-8 pr-2 rounded-lg border border-border/50 bg-muted/20 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary/50 transition-all"
             />
           </div>
@@ -310,7 +339,7 @@ export function TaskDetailPanel({ task, onClose }: TaskDetailPanelProps) {
             <span className="text-xs font-medium">Notificar</span>
           </div>
           <button
-            onClick={() => setShouldNotify(!shouldNotify)}
+            onClick={() => handleNotifyChange(!shouldNotify)}
             className={cn(
               "relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200",
               shouldNotify ? "bg-primary" : "bg-muted"
@@ -347,16 +376,10 @@ export function TaskDetailPanel({ task, onClose }: TaskDetailPanelProps) {
         </button>
         <div className="flex-1" />
         <button
-          onClick={handleSave}
-          disabled={isSaving}
-          className="flex items-center gap-1.5 px-4 py-1.5 rounded-lg bg-primary text-primary-foreground text-xs font-semibold hover:bg-primary/90 transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+          onClick={onClose}
+          className="flex items-center gap-1.5 px-4 py-1.5 rounded-lg bg-primary text-primary-foreground text-xs font-semibold hover:bg-primary/90 transition-all cursor-pointer"
         >
-          {isSaving ? (
-            <Loader2 className="size-3.5 animate-spin" />
-          ) : (
-            <Save className="size-3.5" />
-          )}
-          Salvar
+          Fechar
         </button>
       </div>
     </div>

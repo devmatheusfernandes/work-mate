@@ -1,3 +1,5 @@
+"use client";
+
 import * as React from "react";
 import { User, LogOut, Settings, Shield } from "lucide-react";
 import {
@@ -10,6 +12,9 @@ import {
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
+import { signOutAction } from "@/modules/auth/auth.actions";
+import { toast } from "sonner";
+import Link from "next/link";
 
 interface UserMenuProps {
     user: {
@@ -21,6 +26,7 @@ interface UserMenuProps {
 }
 
 export function UserMenu({ user }: UserMenuProps) {
+    
     const initials = React.useMemo(() => {
         if (!user.name) return "U";
         return user.name
@@ -30,6 +36,21 @@ export function UserMenu({ user }: UserMenuProps) {
             .join("")
             .toUpperCase();
     }, [user.name]);
+
+    const handleSignOut = async () => {
+        try {
+            const result = await signOutAction();
+            if (result?.data?.success) {
+                toast.success("Deslogado com sucesso!");
+                window.location.href = "/signin";
+            } else {
+                toast.error(result?.data?.error || "Erro ao deslogar.");
+            }
+        } catch (error) {
+            console.error("Erro inesperado ao deslogar:", error);
+            toast.error("Erro inesperado ao deslogar.");
+        }
+    };
 
     return (
         <DropdownMenu>
@@ -58,17 +79,24 @@ export function UserMenu({ user }: UserMenuProps) {
                 </DropdownMenuLabel>
                 <DropdownMenuSeparator />
                 <DropdownMenuGroup>
-                    <DropdownMenuItem>
-                        <User className="mr-2 h-4 w-4" />
-                        <span>Meu Perfil</span>
+                    <DropdownMenuItem asChild className="cursor-pointer">
+                        <Link href="/hub/profile" className="flex w-full items-center">
+                            <User className="mr-2 h-4 w-4" />
+                            <span>Meu Perfil</span>
+                        </Link>
                     </DropdownMenuItem>
-                    <DropdownMenuItem>
-                        <Settings className="mr-2 h-4 w-4" />
-                        <span>Configurações</span>
+                    <DropdownMenuItem asChild className="cursor-pointer">
+                        <Link href="/hub/settings" className="flex w-full items-center">
+                            <Settings className="mr-2 h-4 w-4" />
+                            <span>Configurações</span>
+                        </Link>
                     </DropdownMenuItem>
                 </DropdownMenuGroup>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem className="text-destructive focus:bg-destructive/10 dark:focus:bg-destructive/20 focus:text-destructive">
+                <DropdownMenuItem 
+                    onClick={handleSignOut}
+                    className="text-destructive focus:bg-destructive/10 dark:focus:bg-destructive/20 focus:text-destructive cursor-pointer"
+                >
                     <LogOut className="mr-2 h-4 w-4" />
                     <span>Sair</span>
                 </DropdownMenuItem>

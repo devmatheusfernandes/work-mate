@@ -1,0 +1,42 @@
+name: Supabase & Gemini Cron Jobs
+
+on:
+  schedule:
+    - cron: '*/10 * * * *' # Executa a fila de embeddings a cada 10 minutos
+    - cron: '0 0 * * *'    # Limpa storage diariamente à meia-noite
+  workflow_dispatch:
+    inputs:
+      job:
+        description: 'Qual job executar (queue, cleanup ou ambos)'
+        required: true
+        default: 'queue'
+        type: choice
+        options:
+          - queue
+          - cleanup
+          - ambos
+
+jobs:
+  trigger-crons:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Processar Fila de Vetorização (Gemini)
+        if: |
+          github.event_name == 'schedule' && github.event.schedule == '*/10 * * * *' ||
+          github.event_name == 'workflow_dispatch' && (github.event.inputs.job == 'queue' || github.event.inputs.job == 'ambos')
+        run: |
+          echo "Disparando processador de fila..."
+          curl -fail -X POST "${{ secrets.APP_URL }}/api/cron/process-queue" \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            -H "Content-Length: 0"
+          echo "Processamento concluído com sucesso."
+
+      - name: Limpeza de Storage (PDFs Órfãos)
+        if: |
+          github.event_name == 'schedule' && github.event.schedule == '0 0 * * *' ||
+          github.event_name == 'workflow_dispatch' && (github.event.inputs.job == 'cleanup' || github.event.inputs.job == 'ambos')
+        run: |
+          echo "Disparando limpeza de storage..."
+          curl -fail -X GET "${{ secrets.APP_URL }}/api/cron/cleanup-storage" \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}"
+          echo "Limpeza de storage concluída com sucesso."

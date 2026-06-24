@@ -24,7 +24,6 @@ import {
   VaultBody,
   VaultFooter,
   VaultPrimaryButton,
-  VaultSecondaryButton,
 } from "@/components/ui/vault";
 import type { Note, TaskStatus, Subtask } from "@/modules/notes/notes.schema";
 import Link from "next/link";
@@ -70,11 +69,25 @@ export function TaskDetailsVault({
   const [subtasks, setSubtasks] = useState<Subtask[]>(task.taskSubtasks || []);
   const [shouldNotify, setShouldNotify] = useState(task.taskShouldNotify || false);
   const [newSubtaskTitle, setNewSubtaskTitle] = useState("");
-  const [isSaving, setIsSaving] = useState(false);
   const [isConverting, setIsConverting] = useState(false);
 
   const completedCount = subtasks.filter((s) => s.completed).length;
   const progress = subtasks.length > 0 ? (completedCount / subtasks.length) * 100 : 0;
+
+  const saveField = useCallback(async (updates: Partial<Note>) => {
+    try {
+      const result = await updateNoteAction({
+        id: task.id,
+        updates,
+      });
+      if (!result?.data?.success) {
+        toast.error("Erro ao salvar alteração em segundo plano.");
+      }
+    } catch (err) {
+      console.error(err);
+      toast.error("Erro de conexão ao salvar alteração.");
+    }
+  }, [task.id]);
 
   const handleAddSubtask = useCallback(() => {
     if (!newSubtaskTitle.trim()) return;
@@ -83,46 +96,44 @@ export function TaskDetailsVault({
       title: newSubtaskTitle.trim(),
       completed: false,
     };
-    setSubtasks((prev) => [...prev, newSub]);
+    setSubtasks((prev) => {
+      const next = [...prev, newSub];
+      saveField({ taskSubtasks: next });
+      return next;
+    });
     setNewSubtaskTitle("");
-  }, [newSubtaskTitle]);
+  }, [newSubtaskTitle, saveField]);
 
   const handleToggleSubtask = useCallback((id: string) => {
-    setSubtasks((prev) =>
-      prev.map((s) => (s.id === id ? { ...s, completed: !s.completed } : s))
-    );
-  }, []);
+    setSubtasks((prev) => {
+      const next = prev.map((s) => (s.id === id ? { ...s, completed: !s.completed } : s));
+      saveField({ taskSubtasks: next });
+      return next;
+    });
+  }, [saveField]);
 
   const handleDeleteSubtask = useCallback((id: string) => {
-    setSubtasks((prev) => prev.filter((s) => s.id !== id));
-  }, []);
+    setSubtasks((prev) => {
+      const next = prev.filter((s) => s.id !== id);
+      saveField({ taskSubtasks: next });
+      return next;
+    });
+  }, [saveField]);
 
-  const handleSave = async () => {
-    setIsSaving(true);
-    const toastId = toast.loading("Salvando tarefa...");
+  const handleStatusChange = (newStatus: TaskStatus) => {
+    setStatus(newStatus);
+    saveField({ taskStatus: newStatus });
+  };
 
-    try {
-      const result = await updateNoteAction({
-        id: task.id,
-        updates: {
-          taskStatus: status,
-          taskDeadline: deadline || null,
-          taskSubtasks: subtasks,
-          taskShouldNotify: shouldNotify,
-        },
-      });
+  const handleDeadlineChange = (val: string) => {
+    const newDeadline = val ? new Date(val).toISOString() : "";
+    setDeadline(newDeadline);
+    saveField({ taskDeadline: newDeadline || null });
+  };
 
-      if (result?.data?.success) {
-        toast.success("Tarefa salva!", { id: toastId });
-        onOpenChange(false);
-      } else {
-        toast.error("Erro ao salvar tarefa.", { id: toastId });
-      }
-    } catch {
-      toast.error("Erro ao salvar tarefa.", { id: toastId });
-    } finally {
-      setIsSaving(false);
-    }
+  const handleNotifyChange = (val: boolean) => {
+    setShouldNotify(val);
+    saveField({ taskShouldNotify: val });
   };
 
   const handleConvertToNote = async () => {
@@ -173,7 +184,7 @@ export function TaskDetailsVault({
                 return (
                   <button
                     key={s}
-                    onClick={() => setStatus(s)}
+                    onClick={() => handleStatusChange(s)}
                     className={cn(
                       "flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-medium transition-all cursor-pointer",
                       status === s
@@ -199,9 +210,7 @@ export function TaskDetailsVault({
               <input
                 type="datetime-local"
                 value={deadline ? deadline.slice(0, 16) : ""}
-                onChange={(e) =>
-                  setDeadline(e.target.value ? new Date(e.target.value).toISOString() : "")
-                }
+                onChange={(e) => handleDeadlineChange(e.target.value)}
                 className="w-full h-10 pl-10 pr-3 rounded-lg border border-border/50 bg-muted/30 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-primary/50 transition-all"
               />
             </div>
@@ -299,7 +308,7 @@ export function TaskDetailsVault({
               <span className="text-sm font-medium">Notificar ao se aproximar do prazo</span>
             </div>
             <button
-              onClick={() => setShouldNotify(!shouldNotify)}
+              onClick={() => handleNotifyChange(!shouldNotify)}
               className={cn(
                 "relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200",
                 shouldNotify ? "bg-primary" : "bg-muted"
@@ -326,9 +335,9 @@ export function TaskDetailsVault({
         </VaultBody>
 
         <VaultFooter>
-          <VaultSecondaryButton
+          <VaultPrimaryButton
             onClick={handleConvertToNote}
-            disabled={isConverting || isSaving}
+            disabled={isConverting}
           >
             {isConverting ? (
               <>
@@ -340,16 +349,6 @@ export function TaskDetailsVault({
                 <X className="size-4" />
                 Voltar para Nota
               </>
-            )}
-          </VaultSecondaryButton>
-          <VaultPrimaryButton onClick={handleSave} disabled={isSaving || isConverting}>
-            {isSaving ? (
-              <>
-                <Loader2 className="size-4 animate-spin" />
-                Salvando...
-              </>
-            ) : (
-              "Salvar Alterações"
             )}
           </VaultPrimaryButton>
         </VaultFooter>

@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { protectedAction } from "@/lib/safe-action";
 import { notesService } from "./notes.service";
+import { vectorService } from "../vector/vector.service";
 import {
   createNoteSchema,
   createFolderSchema,
@@ -135,4 +136,51 @@ export const emptyTrashAction = protectedAction
     await notesService.emptyTrash(ctx.user.id);
     revalidatePath("/hub/notes");
     return { success: true };
+  });
+
+export const searchSimilarityAction = protectedAction
+  .schema(z.object({ queryText: z.string() }))
+  .action(async ({ parsedInput, ctx }) => {
+    const similarityResults = await vectorService.search(ctx.user.id, parsedInput.queryText, 20);
+    if (similarityResults.length === 0) {
+      return { success: true, notes: [] };
+    }
+
+    const sourceIds = similarityResults.map((r) => r.sourceId);
+    const allNotes = await notesService.getNotes(ctx.user.id);
+    
+    // Filtra apenas as notas correspondentes e ordena pela relevância semântica
+    const matchingNotes = allNotes
+      .filter((n) => sourceIds.includes(n.id))
+      .sort((a, b) => sourceIds.indexOf(a.id) - sourceIds.indexOf(b.id));
+
+    return { success: true, notes: matchingNotes };
+  });
+
+export const embedNoteNowAction = protectedAction
+  .schema(z.object({ id: z.string() }))
+  .action(async ({ parsedInput, ctx }) => {
+    try {
+      await notesService.embedNoteNow(ctx.user.id, parsedInput.id);
+      revalidatePath("/hub/notes");
+      return { success: true, error: undefined as string | undefined };
+    } catch (e: unknown) {
+      console.error("Erro ao vetorizar nota:", e);
+      return { success: false, error: e instanceof Error ? e.message : "Erro ao vetorizar nota." };
+    }
+  });
+
+export const embedMultipleNotesNowAction = protectedAction
+  .schema(z.object({ ids: z.array(z.string()) }))
+  .action(async ({ parsedInput, ctx }) => {
+    try {
+      for (const id of parsedInput.ids) {
+        await notesService.embedNoteNow(ctx.user.id, id);
+      }
+      revalidatePath("/hub/notes");
+      return { success: true, error: undefined as string | undefined };
+    } catch (e: unknown) {
+      console.error("Erro ao vetorizar notas em lote:", e);
+      return { success: false, error: e instanceof Error ? e.message : "Erro ao vetorizar notas." };
+    }
   });

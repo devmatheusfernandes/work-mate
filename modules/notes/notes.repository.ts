@@ -1,167 +1,318 @@
-import fs from "fs";
-import path from "path";
-import { Note, Folder, Tag } from "./notes.schema";
+import { db } from "@/lib/db";
+import { 
+  Note, 
+  Folder, 
+  Tag, 
+  notesTable, 
+  foldersTable, 
+  tagsTable 
+} from "./notes.schema";
+import { eq, and, sql } from "drizzle-orm";
 
-const dbPath = path.join(process.cwd(), "modules", "notes", "mock-db.json");
+type NoteFromDb = typeof notesTable.$inferSelect;
+type FolderFromDb = typeof foldersTable.$inferSelect;
+type TagFromDb = typeof tagsTable.$inferSelect;
 
-function readDb(): { notes: Note[]; folders: Folder[]; tags: Tag[] } {
-  try {
-    if (!fs.existsSync(dbPath)) {
-      // Ensure folder structure exists
-      fs.mkdirSync(path.dirname(dbPath), { recursive: true });
-      const initialState = { notes: [], folders: [], tags: [] };
-      fs.writeFileSync(dbPath, JSON.stringify(initialState, null, 2), "utf-8");
-      return initialState;
-    }
-    const data = fs.readFileSync(dbPath, "utf-8");
-    return JSON.parse(data);
-  } catch (error) {
-    console.error("Error reading mock DB file, returning empty state:", error);
-    return { notes: [], folders: [], tags: [] };
-  }
+// Mapeadores para converter datas (Date) do PostgreSQL de volta para strings ISO (como esperado pelos Zod Schemas e UI)
+function mapNoteFromDb(note: NoteFromDb): Note {
+  return {
+    ...note,
+    type: note.type as "note" | "pdf" | "task",
+    taskStatus: note.taskStatus as "to_start" | "in_progress" | "done" | null | undefined,
+    createdAt: note.createdAt instanceof Date ? note.createdAt.toISOString() : (note.createdAt as string),
+    updatedAt: note.updatedAt instanceof Date ? note.updatedAt.toISOString() : (note.updatedAt as string),
+  };
 }
 
-function writeDb(data: { notes: Note[]; folders: Folder[]; tags: Tag[] }) {
-  try {
-    fs.writeFileSync(dbPath, JSON.stringify(data, null, 2), "utf-8");
-  } catch (error) {
-    console.error("Error writing mock DB file:", error);
-  }
+function mapFolderFromDb(folder: FolderFromDb): Folder {
+  return {
+    ...folder,
+    color: folder.color ?? undefined,
+    createdAt: folder.createdAt instanceof Date ? folder.createdAt.toISOString() : (folder.createdAt as string),
+    updatedAt: folder.updatedAt instanceof Date ? folder.updatedAt.toISOString() : (folder.updatedAt as string),
+  };
+}
+
+function mapTagFromDb(tag: TagFromDb): Tag {
+  return {
+    ...tag,
+    color: tag.color ?? undefined,
+    createdAt: tag.createdAt instanceof Date ? tag.createdAt.toISOString() : (tag.createdAt as string),
+    updatedAt: tag.updatedAt instanceof Date ? tag.updatedAt.toISOString() : (tag.updatedAt as string),
+  };
 }
 
 export const notesRepository = {
   // --- Notes CRUD ---
   async getNotesByUser(userId: string): Promise<Note[]> {
-    const db = readDb();
-    return db.notes.filter((n) => n.userId === userId);
+    const results = await db
+      .select()
+      .from(notesTable)
+      .where(eq(notesTable.userId, userId))
+      .orderBy(sql`${notesTable.pinned} DESC, ${notesTable.createdAt} DESC`);
+
+    return results.map(mapNoteFromDb);
   },
 
   async getNoteById(userId: string, id: string): Promise<Note | null> {
-    const db = readDb();
-    return db.notes.find((n) => n.id === id && n.userId === userId) ?? null;
+    const [result] = await db
+      .select()
+      .from(notesTable)
+      .where(
+        and(
+          eq(notesTable.id, id),
+          eq(notesTable.userId, userId)
+        )
+      )
+      .limit(1);
+
+    return result ? mapNoteFromDb(result) : null;
   },
 
   async createNote(userId: string, note: Note): Promise<Note> {
-    const db = readDb();
-    db.notes.unshift(note);
-    writeDb(db);
-    return note;
+    // Tratamento para garantir datas corretas do Drizzle
+    const dbValues = {
+      ...note,
+      createdAt: note.createdAt ? new Date(note.createdAt) : new Date(),
+      updatedAt: note.updatedAt ? new Date(note.updatedAt) : new Date(),
+    };
+
+    const [inserted] = await db
+      .insert(notesTable)
+      .values(dbValues)
+      .returning();
+
+    return mapNoteFromDb(inserted);
   },
 
   async updateNote(userId: string, id: string, noteUpdates: Partial<Note>): Promise<Note> {
-    const db = readDb();
-    const index = db.notes.findIndex((n) => n.id === id && n.userId === userId);
-    if (index === -1) {
-      throw new Error("Nota não encontrada");
-    }
-    const updated = {
-      ...db.notes[index],
-      ...noteUpdates,
-      updatedAt: new Date().toISOString(),
+    const { createdAt, ...rest } = noteUpdates;
+    const dbValues = {
+      ...rest,
+      updatedAt: new Date(),
+      ...(createdAt ? { createdAt: new Date(createdAt) } : {}),
     };
-    db.notes[index] = updated;
-    writeDb(db);
-    return updated;
+
+    const [updated] = await db
+      .update(notesTable)
+      .set(dbValues)
+      .where(
+        and(
+          eq(notesTable.id, id),
+          eq(notesTable.userId, userId)
+        )
+      )
+      .returning();
+
+    if (!updated) {
+      throw new Error("Nota não encontrada para atualização");
+    }
+
+    return mapNoteFromDb(updated);
   },
 
   async deleteNote(userId: string, id: string): Promise<boolean> {
-    const db = readDb();
-    const initialLen = db.notes.length;
-    db.notes = db.notes.filter((n) => !(n.id === id && n.userId === userId));
-    writeDb(db);
-    return db.notes.length < initialLen;
+    const [deleted] = await db
+      .delete(notesTable)
+      .where(
+        and(
+          eq(notesTable.id, id),
+          eq(notesTable.userId, userId)
+        )
+      )
+      .returning();
+
+    return !!deleted;
   },
 
   // --- Folders CRUD ---
   async getFoldersByUser(userId: string): Promise<Folder[]> {
-    const db = readDb();
-    return db.folders.filter((f) => f.userId === userId);
+    const results = await db
+      .select()
+      .from(foldersTable)
+      .where(eq(foldersTable.userId, userId))
+      .orderBy(foldersTable.title);
+
+    return results.map(mapFolderFromDb);
   },
 
   async getFolderById(userId: string, id: string): Promise<Folder | null> {
-    const db = readDb();
-    return db.folders.find((f) => f.id === id && f.userId === userId) ?? null;
+    const [result] = await db
+      .select()
+      .from(foldersTable)
+      .where(
+        and(
+          eq(foldersTable.id, id),
+          eq(foldersTable.userId, userId)
+        )
+      )
+      .limit(1);
+
+    return result ? mapFolderFromDb(result) : null;
   },
 
   async createFolder(userId: string, folder: Folder): Promise<Folder> {
-    const db = readDb();
-    db.folders.push(folder);
-    writeDb(db);
-    return folder;
+    const dbValues = {
+      ...folder,
+      createdAt: folder.createdAt ? new Date(folder.createdAt) : new Date(),
+      updatedAt: folder.updatedAt ? new Date(folder.updatedAt) : new Date(),
+    };
+
+    const [inserted] = await db
+      .insert(foldersTable)
+      .values(dbValues)
+      .returning();
+
+    return mapFolderFromDb(inserted);
   },
 
   async updateFolder(userId: string, id: string, folderUpdates: Partial<Folder>): Promise<Folder> {
-    const db = readDb();
-    const index = db.folders.findIndex((f) => f.id === id && f.userId === userId);
-    if (index === -1) {
-      throw new Error("Pasta não encontrada");
-    }
-    const updated = {
-      ...db.folders[index],
-      ...folderUpdates,
-      updatedAt: new Date().toISOString(),
+    const { createdAt, ...rest } = folderUpdates;
+    const dbValues = {
+      ...rest,
+      updatedAt: new Date(),
+      ...(createdAt ? { createdAt: new Date(createdAt) } : {}),
     };
-    db.folders[index] = updated;
-    writeDb(db);
-    return updated;
+
+    const [updated] = await db
+      .update(foldersTable)
+      .set(dbValues)
+      .where(
+        and(
+          eq(foldersTable.id, id),
+          eq(foldersTable.userId, userId)
+        )
+      )
+      .returning();
+
+    if (!updated) {
+      throw new Error("Pasta não encontrada para atualização");
+    }
+
+    return mapFolderFromDb(updated);
   },
 
   async deleteFolder(userId: string, id: string): Promise<boolean> {
-    const db = readDb();
-    const initialLen = db.folders.length;
-    db.folders = db.folders.filter((f) => !(f.id === id && f.userId === userId));
-    
-    // Also remove folder reference from sub-notes/sub-folders
-    db.notes = db.notes.map((n) => (n.folderId === id && n.userId === userId ? { ...n, folderId: null } : n));
-    db.folders = db.folders.map((f) => (f.parentId === id && f.userId === userId ? { ...f, parentId: null } : f));
-    
-    writeDb(db);
-    return db.folders.length < initialLen;
+    // Transação para garantir consistência ao deletar pasta e limpar referências
+    return await db.transaction(async (tx) => {
+      const [deleted] = await tx
+        .delete(foldersTable)
+        .where(
+          and(
+            eq(foldersTable.id, id),
+            eq(foldersTable.userId, userId)
+          )
+        )
+        .returning();
+
+      if (!deleted) return false;
+
+      // Limpa a pasta das subnotas e subpastas
+      await tx
+        .update(notesTable)
+        .set({ folderId: null })
+        .where(
+          and(
+            eq(notesTable.folderId, id),
+            eq(notesTable.userId, userId)
+          )
+        );
+
+      await tx
+        .update(foldersTable)
+        .set({ parentId: null })
+        .where(
+          and(
+            eq(foldersTable.parentId, id),
+            eq(foldersTable.userId, userId)
+          )
+        );
+
+      return true;
+    });
   },
 
   // --- Tags CRUD ---
   async getTagsByUser(userId: string): Promise<Tag[]> {
-    const db = readDb();
-    return db.tags.filter((t) => t.userId === userId);
+    const results = await db
+      .select()
+      .from(tagsTable)
+      .where(eq(tagsTable.userId, userId))
+      .orderBy(tagsTable.title);
+
+    return results.map(mapTagFromDb);
   },
 
   async createTag(userId: string, tag: Tag): Promise<Tag> {
-    const db = readDb();
-    db.tags.push(tag);
-    writeDb(db);
-    return tag;
+    const dbValues = {
+      ...tag,
+      createdAt: tag.createdAt ? new Date(tag.createdAt) : new Date(),
+      updatedAt: tag.updatedAt ? new Date(tag.updatedAt) : new Date(),
+    };
+
+    const [inserted] = await db
+      .insert(tagsTable)
+      .values(dbValues)
+      .returning();
+
+    return mapTagFromDb(inserted);
   },
 
   async updateTag(userId: string, id: string, tagUpdates: Partial<Tag>): Promise<Tag> {
-    const db = readDb();
-    const index = db.tags.findIndex((t) => t.id === id && t.userId === userId);
-    if (index === -1) {
-      throw new Error("Tag não encontrada");
-    }
-    const updated = {
-      ...db.tags[index],
-      ...tagUpdates,
-      updatedAt: new Date().toISOString(),
+    const { createdAt, ...rest } = tagUpdates;
+    const dbValues = {
+      ...rest,
+      updatedAt: new Date(),
+      ...(createdAt ? { createdAt: new Date(createdAt) } : {}),
     };
-    db.tags[index] = updated;
-    writeDb(db);
-    return updated;
+
+    const [updated] = await db
+      .update(tagsTable)
+      .set(dbValues)
+      .where(
+        and(
+          eq(tagsTable.id, id),
+          eq(tagsTable.userId, userId)
+        )
+      )
+      .returning();
+
+    if (!updated) {
+      throw new Error("Tag não encontrada para atualização");
+    }
+
+    return mapTagFromDb(updated);
   },
 
   async deleteTag(userId: string, id: string): Promise<boolean> {
-    const db = readDb();
-    const initialLen = db.tags.length;
-    db.tags = db.tags.filter((t) => !(t.id === id && t.userId === userId));
-    
-    // Remove this tagId from all notes
-    db.notes = db.notes.map((n) => {
-      if (n.userId === userId && n.tagIds.includes(id)) {
-        return { ...n, tagIds: n.tagIds.filter((tid) => tid !== id) };
-      }
-      return n;
-    });
+    return await db.transaction(async (tx) => {
+      const [deleted] = await tx
+        .delete(tagsTable)
+        .where(
+          and(
+            eq(tagsTable.id, id),
+            eq(tagsTable.userId, userId)
+          )
+        )
+        .returning();
 
-    writeDb(db);
-    return db.tags.length < initialLen;
+      if (!deleted) return false;
+
+      // Remove a tag de todas as notas do usuário
+      // No PostgreSQL, usamos a função array_remove para retirar a tag do array tagIds
+      await tx
+        .update(notesTable)
+        .set({
+          tagIds: sql`array_remove(${notesTable.tagIds}, ${id})`
+        })
+        .where(
+          and(
+            eq(notesTable.userId, userId),
+            sql`${id} = ANY(${notesTable.tagIds})`
+          )
+        );
+
+      return true;
+    });
   },
 };

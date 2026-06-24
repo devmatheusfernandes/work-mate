@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useCallback } from "react";
+import { useSearchParams } from "next/navigation";
 import { Note, TaskStatus } from "@/modules/notes/notes.schema";
 import { Header } from "@/components/layout/header";
 import {
@@ -168,13 +169,21 @@ function KanbanCard({
 }
 
 export function KanbanBoard({ tasks }: { tasks: Note[] }) {
-  const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
+  const searchParams = useSearchParams();
+  const taskIdParam = searchParams.get("taskId");
+  const [selectedTaskId, setSelectedTaskId] = useState<string | null>(taskIdParam);
   const [dragOverColumn, setDragOverColumn] = useState<TaskStatus | null>(null);
   const { isMobile } = useDevice();
 
+  // Sync selectedTaskId when taskIdParam (search param) changes without cascading setState in an effect
+  const effectiveSelectedTaskId = taskIdParam ?? selectedTaskId;
+  const setEffectiveSelectedTaskId = useCallback((id: string | null) => {
+    setSelectedTaskId(id);
+  }, []);
+
   const selectedTask = useMemo(
-    () => tasks.find((t) => t.id === selectedTaskId) ?? null,
-    [tasks, selectedTaskId],
+    () => tasks.find((t) => t.id === effectiveSelectedTaskId) ?? null,
+    [tasks, effectiveSelectedTaskId],
   );
 
   const tasksByStatus = useMemo(() => {
@@ -313,11 +322,11 @@ export function KanbanBoard({ tasks }: { tasks: Note[] }) {
                         key={task.id}
                         task={task}
                         onClick={() =>
-                          setSelectedTaskId(
-                            selectedTaskId === task.id ? null : task.id,
+                          setEffectiveSelectedTaskId(
+                            effectiveSelectedTaskId === task.id ? null : task.id,
                           )
                         }
-                        isActive={selectedTaskId === task.id}
+                        isActive={effectiveSelectedTaskId === task.id}
                         showArrows={isMobile}
                         onMoveUp={() => handleMoveStatus(task.id, "up")}
                         onMoveDown={() => handleMoveStatus(task.id, "down")}
@@ -352,7 +361,7 @@ export function KanbanBoard({ tasks }: { tasks: Note[] }) {
                       {selectedTask.title}
                     </h2>
                     <button
-                      onClick={() => setSelectedTaskId(null)}
+                      onClick={() => setEffectiveSelectedTaskId(null)}
                       className="shrink-0 size-7 flex items-center justify-center rounded-full hover:bg-muted text-muted-foreground transition-colors cursor-pointer"
                     >
                       <X className="size-4" />
@@ -364,7 +373,7 @@ export function KanbanBoard({ tasks }: { tasks: Note[] }) {
                     <TaskDetailPanel
                       key={selectedTask.id}
                       task={selectedTask}
-                      onClose={() => setSelectedTaskId(null)}
+                      onClose={() => setEffectiveSelectedTaskId(null)}
                     />
                   </div>
                 </div>

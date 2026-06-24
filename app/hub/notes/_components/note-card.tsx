@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { FileText, MoreVertical, Pin, Lock } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
-import { deleteNoteAction, updateNoteAction } from "@/modules/notes/notes.actions";
+import { deleteNoteAction, updateNoteAction, embedNoteNowAction } from "@/modules/notes/notes.actions";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -162,6 +162,21 @@ export function NoteCard({
     }
   };
 
+  const handleEmbedNow = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    const toastId = toast.loading("Vetorizando nota com Gemini...");
+    try {
+      const res = await embedNoteNowAction({ id: note.id });
+      if (res?.data?.success) {
+        toast.success("Nota vetorizada com sucesso!", { id: toastId });
+      } else {
+        toast.error(res?.data?.error || "Erro ao vetorizar nota.", { id: toastId });
+      }
+    } catch {
+      toast.error("Erro ao vetorizar nota.", { id: toastId });
+    }
+  };
+
   // Drag and drop handlers
   const handleDragStart = (e: React.DragEvent) => {
     if (mode !== "normal") {
@@ -241,6 +256,9 @@ export function NoteCard({
                   </DropdownMenuItem>
                   <DropdownMenuItem className="items-center flex flex-col justify-center" onClick={handleToggleLock}>
                     {note.isLocked ? "Destrancar" : "Trancar"}
+                  </DropdownMenuItem>
+                  <DropdownMenuItem className="items-center flex flex-col justify-center" onClick={handleEmbedNow}>
+                    Vetorizar agora
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem className="items-center flex flex-col justify-center"

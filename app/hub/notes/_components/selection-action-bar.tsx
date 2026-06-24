@@ -1,6 +1,6 @@
 "use client";
 
-import { Trash2, Archive, X, RotateCcw } from "lucide-react";
+import { Trash2, Archive, X, RotateCcw, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 interface SelectionActionBarProps {
@@ -9,6 +9,7 @@ interface SelectionActionBarProps {
   onClear: () => void;
   onDelete: () => void;
   onArchive: () => void;
+  onEmbed?: () => void;
   mode?: "normal" | "archive" | "trash";
 }
 
@@ -18,6 +19,7 @@ export function SelectionActionBar({
   onClear,
   onDelete,
   onArchive,
+  onEmbed,
   mode = "normal",
 }: SelectionActionBarProps) {
   const totalSelected = selectedNoteIds.size + selectedFolderIds.size;
@@ -69,6 +71,18 @@ export function SelectionActionBar({
         <div className="h-5 w-px bg-border/60" />
 
         <div className="flex items-center gap-1.5">
+          {onEmbed && selectedNoteIds.size > 0 && mode === "normal" && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={onEmbed}
+              className="h-8 gap-1.5 text-xs text-blue-500 hover:text-blue-400 cursor-pointer px-2"
+            >
+              <Sparkles className="size-3.5 mr-1" />
+              <span>Vetorizar agora</span>
+            </Button>
+          )}
+
           <Button
             variant="ghost"
             size="sm"
