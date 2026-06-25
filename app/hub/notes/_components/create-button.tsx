@@ -7,6 +7,8 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { motion, AnimatePresence, useSpring, useTransform } from "framer-motion";
 import { useChatStore } from "@/modules/chat/chat.store";
+import { useCalendarStore } from "@/modules/calendar/calendar.store";
+import { useDevice } from "@/hooks/ui/use-device";
 import {
   createNoteAction,
   createFolderAction,
@@ -31,6 +33,8 @@ import { Tag } from "@/modules/notes/notes.schema";
 interface CreateButtonProps {
   activeFolderId: string | null;
   tags: Tag[];
+  isTasksSidebarOpen?: boolean;
+  isTasksSidebarExpanded?: boolean;
 }
 
 const tagColors = [
@@ -130,7 +134,24 @@ const itemVariants = {
   },
 };
 
-export function CreateButton({ activeFolderId, tags }: CreateButtonProps) {
+export function CreateButton({ 
+  activeFolderId, 
+  tags, 
+  isTasksSidebarOpen = false, 
+  isTasksSidebarExpanded = false 
+}: CreateButtonProps) {
+  const isChatOpen = useChatStore((state) => state.isSidebarOpen);
+  const isCalendarOpen = useCalendarStore((state) => state.isSidebarOpen);
+  const { isMobile } = useDevice();
+  
+  let rightOffset = 24; // default bottom-6 right-6 (24px)
+  if (!isMobile) {
+    if (isChatOpen) rightOffset += 390;
+    if (isCalendarOpen) rightOffset += 320;
+    if (isTasksSidebarOpen) {
+      rightOffset += isTasksSidebarExpanded ? 480 : 320;
+    }
+  }
   const router = useRouter();
   const setSidebarOpen = useChatStore((state) => state.setSidebarOpen);
   const [isOpenMenu, setIsOpenMenu] = useState(false);
@@ -440,7 +461,12 @@ export function CreateButton({ activeFolderId, tags }: CreateButtonProps) {
         className="hidden"
       />
 
-      <div ref={menuRef} className="fixed bottom-6 right-6 z-50 flex flex-col items-end gap-3">
+      <motion.div
+        ref={menuRef}
+        animate={{ right: rightOffset }}
+        transition={{ type: "spring", stiffness: 300, damping: 25 }}
+        className="fixed bottom-6 z-50 flex flex-col items-end gap-3"
+      >
         {/* Animated menu items */}
         <AnimatePresence>
           {isOpenMenu && (
@@ -546,7 +572,7 @@ export function CreateButton({ activeFolderId, tags }: CreateButtonProps) {
             </motion.span>
           )}
         </AnimatePresence>
-      </div>
+      </motion.div>
 
       {/* Vault: Criar Pasta */}
       <Vault open={activeVault === "folder"} onOpenChange={(open) => !open && setActiveVault(null)}>

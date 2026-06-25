@@ -13,7 +13,10 @@ import {
   Plus,
   Archive,
   Menu,
-  X
+  X,
+  FileText,
+  CheckCircle2,
+  Calendar as CalendarIcon
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -84,6 +87,7 @@ export function ChatInterface({
   const [availableNotes, setAvailableNotes] = useState<{ id: string; title: string; type: string }[]>([]);
   const [availableCalendars, setAvailableCalendars] = useState<{ id: string; summary: string }[]>([]);
   const [activeSuggestionIndex, setActiveSuggestionIndex] = useState(0);
+  const [selectedReferences, setSelectedReferences] = useState<{ id: string; title: string; type: string }[]>([]);
 
   // Fetch mention context data
   useEffect(() => {
@@ -147,28 +151,23 @@ export function ChatInterface({
   };
 
   const handleSelectMention = (item: { id: string; title: string; type: string }) => {
+    // Remove the trigger character (@ or /) and any search query that was typed
     const textBeforeMention = inputValue.substring(0, mentionTriggerIndex);
     const textAfterMention = inputValue.substring(mentionTriggerIndex + mentionSearchText.length + 1);
     
-    let formattedMention = "";
-    if (item.type === "calendar") {
-      formattedMention = `[Agenda: ${item.title}](calendar:${item.id}) `;
-    } else if (item.type === "task") {
-      formattedMention = `[Tarefa: ${item.title}](/hub/tasks?taskId=${item.id}) `;
-    } else {
-      formattedMention = `[Nota: ${item.title}](/hub/notes/${item.id}) `;
-    }
-
-    const newValue = textBeforeMention + formattedMention + textAfterMention;
-    setInputValue(newValue);
+    setInputValue(textBeforeMention + textAfterMention);
     setShowMentionSuggestions(false);
+    
+    // Add reference if not already added
+    if (!selectedReferences.some((ref) => ref.id === item.id)) {
+      setSelectedReferences((prev) => [...prev, item]);
+    }
     
     if (textareaRef.current) {
       textareaRef.current.focus();
-      const newCursorPos = textBeforeMention.length + formattedMention.length;
       setTimeout(() => {
         if (textareaRef.current) {
-          textareaRef.current.setSelectionRange(newCursorPos, newCursorPos);
+          textareaRef.current.setSelectionRange(mentionTriggerIndex, mentionTriggerIndex);
         }
       }, 0);
     }
@@ -214,10 +213,26 @@ export function ChatInterface({
   }, [messages, isGenerating]);
 
   const handleSend = async (text: string) => {
-    if (!text.trim() || isGenerating) return;
+    if ((!text.trim() && selectedReferences.length === 0) || isGenerating) return;
+    
+    let finalContent = text.trim();
+    if (selectedReferences.length > 0) {
+      const refsText = selectedReferences.map(ref => {
+        if (ref.type === "calendar") {
+          return `[Agenda: ${ref.title}](calendar:${ref.id})`;
+        } else if (ref.type === "task") {
+          return `[Tarefa: ${ref.title}](/hub/tasks?taskId=${ref.id})`;
+        } else {
+          return `[Nota: ${ref.title}](/hub/notes/${ref.id})`;
+        }
+      }).join(" ");
+      finalContent = finalContent ? `${finalContent}\n\n${refsText}` : refsText;
+    }
+    
     setInputValue("");
+    setSelectedReferences([]);
     try {
-      await sendMessage(text);
+      await sendMessage(finalContent);
     } catch {
       toast.error("Erro ao enviar mensagem.");
     }
@@ -780,11 +795,10 @@ export function ChatInterface({
             layout
             transition={{ type: "spring", stiffness: 350, damping: 30 }}
             className={cn(
-              "p-4 shrink-0 z-10 w-full flex justify-center",
+              "p-2 shrink-0 z-10 w-full flex justify-center bg-background",
               isSidebar 
-                ? "bg-gradient-to-t from-card via-card/95 to-transparent" 
-                : "bg-gradient-to-t from-background via-background/95 to-transparent",
-              !hasMessages ? "absolute bottom-[20%] left-0 right-0 py-0" : "border-t border-border/20"
+                ? "bg-card border-t border-border/10 px-2 pb-3 pt-2" 
+                : hasMessages && "border-t border-border/20"
             )}
           >
             <div className="w-full max-w-xl flex flex-col items-center relative">
@@ -818,71 +832,166 @@ export function ChatInterface({
                 </div>
               )}
 
-              <motion.div
+              {/* Input wrapper card */}
+              <motion.div 
                 layout
-                transition={{ type: "spring", stiffness: 350, damping: 30 }}
                 className={cn(
-                  "flex items-center gap-2 border bg-card w-full transition-all duration-200",
-                  isFocused 
-                    ? "border-primary/50 ring-1 ring-primary/20" 
-                    : "border-border/60 hover:border-border",
-                  hasMessages 
-                    ? "rounded-2xl p-2 px-3" 
-                    : "rounded-full p-2.5 px-4"
+                  "w-full border border-border/40 transition-all duration-200 bg-card select-none shadow-xs",
+                  isFocused && "border-primary/50 ring-2 ring-primary/10 shadow-md shadow-primary/5",
+                  (hasMessages || selectedReferences.length > 0)
+                    ? "rounded-2xl p-2 px-3 flex flex-col gap-2" 
+                    : "rounded-full p-2.5 px-4 flex items-center gap-2"
                 )}
               >
-                <motion.button
-                  layout
-                  onClick={() => fileInputRef.current?.click()}
-                  disabled={isGenerating}
-                  className={cn(
-                    "flex items-center justify-center rounded-full hover:bg-muted text-muted-foreground transition-all shrink-0 cursor-pointer disabled:opacity-40",
-                    hasMessages ? "size-9" : "size-10"
-                  )}
-                  title="Anexar arquivo"
-                >
-                  <Paperclip className="size-4" />
-                </motion.button>
-                
-                <input
-                  type="file"
-                  ref={fileInputRef}
-                  className="hidden"
-                  onChange={handleUploadSimulate}
-                  accept=".txt,.pdf,.png,.jpg,.jpeg,.json"
-                />
+                {hasMessages || selectedReferences.length > 0 ? (
+                  <>
+                    {selectedReferences.length > 0 && (
+                      <div className="flex flex-wrap gap-1.5 px-1 pt-1 select-none border-b border-border/10 pb-2 w-full">
+                        {selectedReferences.map((ref) => {
+                          let Icon = FileText;
+                          let colorClass = "bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20";
+                          
+                          if (ref.type === "calendar") {
+                            Icon = CalendarIcon;
+                            colorClass = "bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-500/20";
+                          } else if (ref.type === "task") {
+                            Icon = CheckCircle2;
+                            colorClass = "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20";
+                          }
 
-                <textarea
-                  ref={textareaRef}
-                  value={inputValue}
-                  onChange={handleInputChange}
-                  onKeyDown={handleKeyDown}
-                  onFocus={() => setIsFocused(true)}
-                  onBlur={() => {
-                    setIsFocused(false);
-                    setTimeout(() => setShowMentionSuggestions(false), 200);
-                  }}
-                  disabled={isGenerating}
-                  placeholder="Digite @ para notas/tarefas ou / para agendas..."
-                  rows={1}
-                  className="flex-1 bg-transparent border-none outline-none resize-none no-scrollbar text-sm placeholder:text-muted-foreground/60 text-foreground py-1.5 px-1 min-h-[24px] max-h-[120px] focus:ring-0 leading-relaxed"
-                />
+                          return (
+                            <div
+                              key={ref.id}
+                              className={cn(
+                                "flex items-center gap-1.5 px-2 py-1 rounded-lg border text-[10px] font-semibold transition-all animate-in fade-in zoom-in-95 duration-150",
+                                colorClass
+                              )}
+                            >
+                              <Icon className="size-3 shrink-0" />
+                              <span className="truncate max-w-[150px]">{ref.title}</span>
+                              <button
+                                type="button"
+                                onClick={() => setSelectedReferences(prev => prev.filter((r) => r.id !== ref.id))}
+                                className="hover:bg-foreground/10 rounded-full p-0.5 transition-colors cursor-pointer text-muted-foreground hover:text-foreground"
+                              >
+                                <X className="size-2.5" />
+                              </button>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                    <div className="w-full flex items-end gap-2">
+                      <motion.button
+                        layout
+                        onClick={() => fileInputRef.current?.click()}
+                        disabled={isGenerating}
+                        className={cn(
+                          "flex items-center justify-center rounded-full hover:bg-muted text-muted-foreground transition-all shrink-0 cursor-pointer disabled:opacity-40",
+                          hasMessages ? "size-9" : "size-10"
+                        )}
+                        title="Anexar arquivo"
+                      >
+                        <Paperclip className="size-4" />
+                      </motion.button>
+                      
+                      <input
+                        type="file"
+                        ref={fileInputRef}
+                        className="hidden"
+                        onChange={handleUploadSimulate}
+                        accept=".txt,.pdf,.png,.jpg,.jpeg,.json"
+                      />
 
-                <motion.button
-                  layout
-                  onClick={() => handleSend(inputValue)}
-                  disabled={!inputValue.trim() || isGenerating}
-                  className={cn(
-                    "flex items-center justify-center text-white transition-all shrink-0 cursor-pointer rounded-full",
-                    inputValue.trim() && !isGenerating
-                      ? "bg-primary hover:bg-primary/95 scale-100"
-                      : "bg-muted text-muted-foreground/40 scale-95 cursor-not-allowed",
-                    hasMessages ? "size-9" : "size-10"
-                  )}
-                  title="Enviar"
-                >
-                  <ArrowUp className="size-4" />
-                </motion.button>
+                      <textarea
+                        ref={textareaRef}
+                        value={inputValue}
+                        onChange={handleInputChange}
+                        onKeyDown={handleKeyDown}
+                        onFocus={() => setIsFocused(true)}
+                        onBlur={() => {
+                          setIsFocused(false);
+                          setTimeout(() => setShowMentionSuggestions(false), 200);
+                        }}
+                        disabled={isGenerating}
+                        placeholder="@ para notas ou / para agendas..."
+                        rows={1}
+                        className="flex-1 bg-transparent border-none outline-none resize-none no-scrollbar text-sm placeholder:text-muted-foreground/60 text-foreground py-1.5 px-1 min-h-[24px] max-h-[120px] focus:ring-0 leading-relaxed"
+                      />
+
+                      <motion.button
+                        layout
+                        onClick={() => handleSend(inputValue)}
+                        disabled={(!inputValue.trim() && selectedReferences.length === 0) || isGenerating}
+                        className={cn(
+                          "flex items-center justify-center text-white transition-all shrink-0 cursor-pointer rounded-full",
+                          (inputValue.trim() || selectedReferences.length > 0) && !isGenerating
+                            ? "bg-primary hover:bg-primary/95 scale-100"
+                            : "bg-muted text-muted-foreground/40 scale-95 cursor-not-allowed",
+                          hasMessages ? "size-9" : "size-10"
+                        )}
+                        title="Enviar"
+                      >
+                        <ArrowUp className="size-4" />
+                      </motion.button>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <motion.button
+                      layout
+                      onClick={() => fileInputRef.current?.click()}
+                      disabled={isGenerating}
+                      className={cn(
+                        "flex items-center justify-center rounded-full hover:bg-muted text-muted-foreground transition-all shrink-0 cursor-pointer disabled:opacity-40",
+                        hasMessages ? "size-9" : "size-10"
+                      )}
+                      title="Anexar arquivo"
+                    >
+                      <Paperclip className="size-4" />
+                    </motion.button>
+                    
+                    <input
+                      type="file"
+                      ref={fileInputRef}
+                      className="hidden"
+                      onChange={handleUploadSimulate}
+                      accept=".txt,.pdf,.png,.jpg,.jpeg,.json"
+                    />
+
+                    <textarea
+                      ref={textareaRef}
+                      value={inputValue}
+                      onChange={handleInputChange}
+                      onKeyDown={handleKeyDown}
+                      onFocus={() => setIsFocused(true)}
+                      onBlur={() => {
+                        setIsFocused(false);
+                        setTimeout(() => setShowMentionSuggestions(false), 200);
+                      }}
+                      disabled={isGenerating}
+                      placeholder="@ para notas ou / para agendas..."
+                      rows={1}
+                      className="flex-1 bg-transparent border-none outline-none resize-none no-scrollbar text-sm placeholder:text-muted-foreground/60 text-foreground py-1.5 px-1 min-h-[24px] max-h-[120px] focus:ring-0 leading-relaxed"
+                    />
+
+                    <motion.button
+                      layout
+                      onClick={() => handleSend(inputValue)}
+                      disabled={(!inputValue.trim() && selectedReferences.length === 0) || isGenerating}
+                      className={cn(
+                        "flex items-center justify-center text-white transition-all shrink-0 cursor-pointer rounded-full",
+                        (inputValue.trim() || selectedReferences.length > 0) && !isGenerating
+                          ? "bg-primary hover:bg-primary/95 scale-100"
+                          : "bg-muted text-muted-foreground/40 scale-95 cursor-not-allowed",
+                        hasMessages ? "size-9" : "size-10"
+                      )}
+                      title="Enviar"
+                    >
+                      <ArrowUp className="size-4" />
+                    </motion.button>
+                  </>
+                )}
               </motion.div>
             </div>
           </motion.div>

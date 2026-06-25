@@ -33,6 +33,7 @@ export function NotesDashboard({
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedTagId, setSelectedTagId] = useState<string | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [tasksSidebarExpanded, setTasksSidebarExpanded] = useState(false);
   const { isMobile } = useDevice();
 
   const [localNotes, setLocalNotes] = useState(notes);
@@ -416,7 +417,12 @@ export function NotesDashboard({
         />
 
         {/* Floating Create FAB */}
-        <CreateButton activeFolderId={activeFolderId} tags={tags} />
+        <CreateButton 
+          activeFolderId={activeFolderId} 
+          tags={tags} 
+          isTasksSidebarOpen={sidebarOpen}
+          isTasksSidebarExpanded={tasksSidebarExpanded}
+        />
       </div>
 
       {/* Tasks Sidebar (Desktop only) */}
@@ -429,6 +435,7 @@ export function NotesDashboard({
             if (!sidebarOpen) setSidebarOpen(true);
           }}
           onUpdateNoteOptimistic={handleUpdateNoteOptimistic}
+          onExpandedChange={setTasksSidebarExpanded}
         />
       )}
     </div>

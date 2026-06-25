@@ -26,6 +26,7 @@ interface TasksSidebarProps {
     updates: Partial<Note>,
     apiCall: () => Promise<{ data?: { success?: boolean } } | undefined>
   ) => void;
+  onExpandedChange?: (expanded: boolean) => void;
 }
 
 const LANES: {
@@ -185,8 +186,15 @@ export function TasksSidebar({
   onToggle,
   onDragOverSidebar,
   onUpdateNoteOptimistic,
+  onExpandedChange,
 }: TasksSidebarProps) {
-  const [expandedLane, setExpandedLane] = useState<TaskStatus | null>(null);
+  const [expandedLane, setExpandedLaneState] = useState<TaskStatus | null>(null);
+  
+  const setExpandedLane = useCallback((lane: TaskStatus | null) => {
+    setExpandedLaneState(lane);
+    onExpandedChange?.(lane !== null);
+  }, [onExpandedChange]);
+
   const [dragOverLane, setDragOverLane] = useState<TaskStatus | null>(null);
   const [selectedTask, setSelectedTask] = useState<Note | null>(null);
 
