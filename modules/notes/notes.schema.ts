@@ -93,6 +93,7 @@ export const noteSchema = z.object({
   fileUrl: z.string().optional().nullable(),
   fileSize: z.number().optional().nullable(),
   isLocked: z.boolean().default(false),
+  isVectorized: z.boolean().optional(),
   // --- Task-specific fields (only relevant when type === "task") ---
   taskStatus: taskStatusEnum.nullable().optional(),
   taskDeadline: z.string().nullable().optional(),

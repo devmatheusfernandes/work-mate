@@ -99,6 +99,29 @@ export const vectorRepository = {
       .limit(limit);
   },
 
+  // Retorna todos os IDs de origem cujo status é synced para o usuário
+  async getVectorizedIdsByUser(userId: string) {
+    return db
+      .select({ sourceId: embeddingsQueueTable.sourceId })
+      .from(embeddingsQueueTable)
+      .where(
+        and(
+          eq(embeddingsQueueTable.userId, userId),
+          eq(embeddingsQueueTable.syncStatus, "synced")
+        )
+      );
+  },
+
+  // Retorna o status de sincronização de um item específico
+  async getSyncStatus(sourceId: string) {
+    const [result] = await db
+      .select({ syncStatus: embeddingsQueueTable.syncStatus })
+      .from(embeddingsQueueTable)
+      .where(eq(embeddingsQueueTable.sourceId, sourceId))
+      .limit(1);
+    return result;
+  },
+
   // Busca semântica por similaridade de cosseno (<=> em pgvector)
   async searchSimilarity(userId: string, queryVector: number[], limit = 10) {
     const vectorString = `[${queryVector.join(",")}]`;

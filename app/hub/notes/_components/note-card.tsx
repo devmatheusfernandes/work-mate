@@ -346,7 +346,21 @@ export function NoteCard({
 
       {/* Footer details */}
       <div className="flex justify-between items-center mt-3 pt-2 border-t border-border/20 text-[10px] text-muted-foreground">
-        <span>{new Date(note.createdAt).toLocaleDateString("pt-BR")}</span>
+        <div className="flex items-center gap-2">
+          <span>{new Date(note.createdAt).toLocaleDateString("pt-BR")}</span>
+          <span className="h-2 w-px bg-border/40" />
+          {note.isVectorized ? (
+            <span className="flex items-center gap-1 text-[9px] font-medium text-emerald-500 bg-emerald-500/10 px-1.5 py-0.5 rounded-md border border-emerald-500/20">
+              <span className="size-1 rounded-full bg-emerald-500 animate-pulse" />
+              IA Ativa
+            </span>
+          ) : (
+            <span className="flex items-center gap-1 text-[9px] font-medium text-muted-foreground bg-muted/40 px-1.5 py-0.5 rounded-md border border-border/20">
+              <span className="size-1 rounded-full bg-muted-foreground/60" />
+              IA Pendente
+            </span>
+          )}
+        </div>
         {note.pinned && <Pin className="size-3 text-primary fill-primary/10" />}
       </div>
     </article>

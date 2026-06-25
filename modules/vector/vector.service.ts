@@ -164,6 +164,18 @@ export const vectorService = {
     await vectorRepository.updateEmbedding(queueId, embedding);
   },
 
+  // Retorna um Set com os IDs das notas vetorizadas do usuário
+  async getVectorizedNoteIds(userId: string): Promise<Set<string>> {
+    const items = await vectorRepository.getVectorizedIdsByUser(userId);
+    return new Set(items.map((item) => item.sourceId));
+  },
+
+  // Retorna se uma nota específica está vetorizada
+  async isNoteVectorized(sourceId: string): Promise<boolean> {
+    const item = await vectorRepository.getSyncStatus(sourceId);
+    return item?.syncStatus === "synced";
+  },
+
   // Realiza a busca semântica
   async search(userId: string, queryText: string, limit = 10) {
     if (!queryText || queryText.trim() === "") {

@@ -153,7 +153,12 @@ function syncHtmlWithSubtasks(content: string | null | undefined, subtasks: { ti
 export const notesService = {
   // --- Notes Services ---
   async getNotes(userId: string): Promise<Note[]> {
-    return notesRepository.getNotesByUser(userId);
+    const notes = await notesRepository.getNotesByUser(userId);
+    const vectorizedIds = await vectorService.getVectorizedNoteIds(userId);
+    return notes.map((note) => ({
+      ...note,
+      isVectorized: vectorizedIds.has(note.id),
+    }));
   },
   
   async getNote(userId: string, id: string): Promise<Note> {
@@ -161,7 +166,11 @@ export const notesService = {
     if (!note) {
       throw new Error("Nota não encontrada");
     }
-    return note;
+    const isVectorized = await vectorService.isNoteVectorized(id);
+    return {
+      ...note,
+      isVectorized,
+    };
   },
 
   async createNote(userId: string, data: CreateNoteDTO): Promise<Note> {
@@ -201,10 +210,12 @@ export const notesService = {
     
     const note = await notesRepository.createNote(userId, newNote);
 
+    let isVectorized = false;
     // Vetoriza de forma imediata (síncrona) para manter RAG atualizado
     if (!note.trashed) {
       try {
         await vectorService.embedNow(userId, note.id, note.type as NoteSourceType, getContentToEmbed(note));
+        isVectorized = true;
       } catch (e) {
         console.error("Erro ao vetorizar nota síncronamente na criação:", e);
         // Fallback: garante que fica na fila pendente
@@ -212,7 +223,7 @@ export const notesService = {
       }
     }
 
-    return note;
+    return { ...note, isVectorized };
   },
 
   async updateNote(userId: string, id: string, data: Partial<Note>): Promise<Note> {
@@ -260,12 +271,14 @@ export const notesService = {
     
     const updatedNote = await notesRepository.updateNote(userId, id, data);
 
+    let isVectorized = false;
     // Se a nota foi para a lixeira, removemos da fila de embeddings
     if (updatedNote.trashed) {
       await vectorService.dequeue(updatedNote.id, updatedNote.type as NoteSourceType);
     } else {
       try {
         await vectorService.embedNow(userId, updatedNote.id, updatedNote.type as NoteSourceType, getContentToEmbed(updatedNote));
+        isVectorized = true;
       } catch (e) {
         console.error("Erro ao vetorizar nota síncronamente na atualização:", e);
         // Fallback: garante que fica na fila
@@ -273,7 +286,7 @@ export const notesService = {
       }
     }
 
-    return updatedNote;
+    return { ...updatedNote, isVectorized };
   },
 
   async deleteNote(userId: string, id: string): Promise<boolean> {
