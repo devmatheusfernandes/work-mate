@@ -422,22 +422,21 @@ export function NotesDashboard({
           tags={tags} 
           isTasksSidebarOpen={sidebarOpen}
           isTasksSidebarExpanded={tasksSidebarExpanded}
+          onOpenTasksSidebar={() => setSidebarOpen(true)}
         />
       </div>
 
-      {/* Tasks Sidebar (Desktop only) */}
-      {!isMobile && (
-        <TasksSidebar
-          tasks={allTasks}
-          isOpen={sidebarOpen}
-          onToggle={() => setSidebarOpen((prev) => !prev)}
-          onDragOverSidebar={() => {
-            if (!sidebarOpen) setSidebarOpen(true);
-          }}
-          onUpdateNoteOptimistic={handleUpdateNoteOptimistic}
-          onExpandedChange={setTasksSidebarExpanded}
-        />
-      )}
+      {/* Tasks Sidebar */}
+      <TasksSidebar
+        tasks={allTasks}
+        isOpen={sidebarOpen}
+        onToggle={() => setSidebarOpen((prev) => !prev)}
+        onDragOverSidebar={() => {
+          if (!sidebarOpen) setSidebarOpen(true);
+        }}
+        onUpdateNoteOptimistic={handleUpdateNoteOptimistic}
+        onExpandedChange={setTasksSidebarExpanded}
+      />
     </div>
   );
 }

@@ -2,7 +2,7 @@
 
 import { useState, useRef, ChangeEvent, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { Plus, FolderPlus, Tag as TagIcon, FilePlus, FileText, Loader2, Trash2, Sparkles, CheckCircle2 } from "lucide-react";
+import { Plus, FolderPlus, Tag as TagIcon, FilePlus, FileText, Loader2, Trash2, Sparkles, CheckCircle2, Calendar as CalendarIcon, KanbanSquare } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { motion, AnimatePresence, useSpring, useTransform } from "framer-motion";
@@ -35,6 +35,7 @@ interface CreateButtonProps {
   tags: Tag[];
   isTasksSidebarOpen?: boolean;
   isTasksSidebarExpanded?: boolean;
+  onOpenTasksSidebar?: () => void;
 }
 
 const tagColors = [
@@ -85,6 +86,18 @@ const menuItems = [
     label: "Assistente IA",
     gradient: "from-pink-500 to-rose-500",
     Icon: Sparkles,
+  },
+  {
+    key: "calendar",
+    label: "Abrir Agenda",
+    gradient: "from-fuchsia-500 to-pink-500",
+    Icon: CalendarIcon,
+  },
+  {
+    key: "tasks_sidebar",
+    label: "Abrir Tarefas",
+    gradient: "from-cyan-500 to-blue-500",
+    Icon: KanbanSquare,
   },
 ] as const;
 
@@ -138,7 +151,8 @@ export function CreateButton({
   activeFolderId, 
   tags, 
   isTasksSidebarOpen = false, 
-  isTasksSidebarExpanded = false 
+  isTasksSidebarExpanded = false,
+  onOpenTasksSidebar
 }: CreateButtonProps) {
   const isChatOpen = useChatStore((state) => state.isSidebarOpen);
   const isCalendarOpen = useCalendarStore((state) => state.isSidebarOpen);
@@ -154,6 +168,7 @@ export function CreateButton({
   }
   const router = useRouter();
   const setSidebarOpen = useChatStore((state) => state.setSidebarOpen);
+  const setCalendarSidebarOpen = useCalendarStore((state) => state.setSidebarOpen);
   const [isOpenMenu, setIsOpenMenu] = useState(false);
   const [activeVault, setActiveVault] = useState<"folder" | "tag" | null>(null);
 
@@ -383,6 +398,18 @@ export function CreateButton({
       case "chat":
         setIsOpenMenu(false);
         setSidebarOpen(true);
+        break;
+      case "calendar":
+        setIsOpenMenu(false);
+        setCalendarSidebarOpen(true);
+        break;
+      case "tasks_sidebar":
+        setIsOpenMenu(false);
+        if (onOpenTasksSidebar) {
+          onOpenTasksSidebar();
+        } else {
+          router.push("/hub/tasks");
+        }
         break;
     }
   };

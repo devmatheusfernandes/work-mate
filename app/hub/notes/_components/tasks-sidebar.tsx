@@ -15,6 +15,8 @@ import { motion, AnimatePresence } from "framer-motion";
 import { updateNoteAction } from "@/modules/notes/notes.actions";
 import { TaskDetailsVault } from "./task-details-vault";
 import type { Note, TaskStatus } from "@/modules/notes/notes.schema";
+import { useDevice } from "@/hooks/ui/use-device";
+import { Vault, VaultContent, VaultTitle } from "@/components/ui/vault";
 
 interface TasksSidebarProps {
   tasks: Note[];
@@ -188,6 +190,9 @@ export function TasksSidebar({
   onUpdateNoteOptimistic,
   onExpandedChange,
 }: TasksSidebarProps) {
+  const { isMobile, isStandalone } = useDevice();
+  const isMobileOrPwa = isMobile || isStandalone;
+
   const [expandedLane, setExpandedLaneState] = useState<TaskStatus | null>(null);
   
   const setExpandedLane = useCallback((lane: TaskStatus | null) => {
@@ -322,6 +327,138 @@ export function TasksSidebar({
 
   const isExpanded = expandedLane !== null;
 
+  const renderSidebarContent = () => {
+    return (
+      <div className="h-full w-full bg-card overflow-hidden flex flex-col relative">
+        {/* Sidebar Header */}
+        <div className="flex items-center justify-between px-4 h-12 border-b border-border/30 shrink-0">
+          {isExpanded ? (
+            <button
+              onClick={() => setExpandedLane(null)}
+              className="flex items-center gap-1.5 text-sm font-semibold text-foreground hover:text-primary transition-colors cursor-pointer"
+            >
+              <ArrowLeft className="size-4" />
+              Voltar
+            </button>
+          ) : (
+            <h2 className="text-sm font-bold tracking-tight text-foreground">
+              Tarefas
+            </h2>
+          )}
+          <button
+            onClick={onToggle}
+            className="flex items-center justify-center size-7 rounded-full hover:bg-muted text-muted-foreground transition-colors cursor-pointer"
+          >
+            <ChevronRight className="size-4" />
+          </button>
+        </div>
+
+        {/* Lanes */}
+        <div className="flex-1 overflow-y-auto p-3 flex flex-col gap-3">
+          {LANES.map((lane) => {
+            const laneTasks = tasksByStatus(lane.status);
+            const isThisExpanded = expandedLane === lane.status;
+            const isHidden = isExpanded && !isThisExpanded;
+
+            if (isHidden) return null;
+
+            return (
+              <div
+                key={lane.status}
+                onDragOver={(e) => {
+                  e.preventDefault();
+                  setDragOverLane(lane.status);
+                }}
+                onDragLeave={() => setDragOverLane(null)}
+                onDrop={(e) => handleDrop(e, lane.status)}
+                className={cn(
+                  "rounded-xl border p-3 transition-all duration-200",
+                  lane.bgColor,
+                  lane.borderColor,
+                  dragOverLane === lane.status &&
+                    "ring-2 ring-primary/30 border-primary/40",
+                  isThisExpanded ? "flex-1" : "min-h-[100px]"
+                )}
+              >
+                {/* Lane Header */}
+                <div className="flex items-center justify-between mb-2">
+                  <div className={cn("flex items-center gap-1.5", lane.color)}>
+                    {lane.icon}
+                    <span className="text-xs font-bold uppercase tracking-wider">
+                      {lane.label}
+                    </span>
+                    <span className="text-[10px] font-medium opacity-60">
+                      ({laneTasks.length})
+                    </span>
+                  </div>
+                  {!isExpanded && laneTasks.length > 2 && (
+                    <button
+                      onClick={() => setExpandedLane(lane.status)}
+                      className="text-[10px] font-medium text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+                    >
+                      Ver todas
+                    </button>
+                  )}
+                </div>
+
+                {/* Lane Content */}
+                {isThisExpanded ? (
+                  // Expanded: vertical list
+                  <div className="flex flex-col gap-2 overflow-y-auto">
+                    {laneTasks.length === 0 && dragOverLane !== lane.status ? (
+                      <p className="text-xs text-muted-foreground/50 text-center py-4">
+                        Nenhuma tarefa
+                      </p>
+                    ) : (
+                      renderLaneTasks(laneTasks, lane.status, true)
+                    )}
+                  </div>
+                ) : (
+                  // Collapsed: horizontal scroll
+                  <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1">
+                    {laneTasks.length === 0 && dragOverLane !== lane.status ? (
+                      <p className="text-xs text-muted-foreground/50 text-center w-full py-4">
+                        Arraste uma nota aqui
+                      </p>
+                    ) : (
+                      renderLaneTasks(laneTasks, lane.status, false)
+                    )}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    );
+  };
+
+  if (isMobileOrPwa) {
+    return (
+      <>
+        <Vault open={isOpen} onOpenChange={(open) => !open && onToggle()}>
+          <VaultContent aria-label="Tarefas" noPadding className="h-[80vh] max-h-[80vh]">
+            <VaultTitle className="sr-only">Tarefas</VaultTitle>
+            <div className="h-full w-full overflow-hidden">
+              {renderSidebarContent()}
+            </div>
+          </VaultContent>
+        </Vault>
+
+        {/* Task Details Vault */}
+        {selectedTask && (
+          <TaskDetailsVault
+            task={selectedTask}
+            open={!!selectedTask}
+            onOpenChange={(open) => {
+              if (!open) setSelectedTask(null);
+            }}
+          />
+        )}
+      </>
+    );
+  }
+
   return (
     <>
       {/* Toggle Handle */}
@@ -357,105 +494,7 @@ export function TasksSidebar({
                 "h-full bg-card rounded-xl overflow-hidden flex flex-col relative border border-border/20",
                 isExpanded ? "w-[470px]" : "w-full"
               )}>
-            {/* Sidebar Header */}
-            <div className="flex items-center justify-between px-4 h-12 border-b border-border/30 shrink-0">
-              {isExpanded ? (
-                <button
-                  onClick={() => setExpandedLane(null)}
-                  className="flex items-center gap-1.5 text-sm font-semibold text-foreground hover:text-primary transition-colors cursor-pointer"
-                >
-                  <ArrowLeft className="size-4" />
-                  Voltar
-                </button>
-              ) : (
-                <h2 className="text-sm font-bold tracking-tight text-foreground">
-                  Tarefas
-                </h2>
-              )}
-              <button
-                onClick={onToggle}
-                className="flex items-center justify-center size-7 rounded-full hover:bg-muted text-muted-foreground transition-colors cursor-pointer"
-              >
-                <ChevronRight className="size-4" />
-              </button>
-            </div>
-
-            {/* Lanes */}
-            <div className="flex-1 overflow-y-auto p-3 flex flex-col gap-3">
-              {LANES.map((lane) => {
-                const laneTasks = tasksByStatus(lane.status);
-                const isThisExpanded = expandedLane === lane.status;
-                const isHidden = isExpanded && !isThisExpanded;
-
-                if (isHidden) return null;
-
-                return (
-                  <div
-                    key={lane.status}
-                    onDragOver={(e) => {
-                      e.preventDefault();
-                      setDragOverLane(lane.status);
-                    }}
-                    onDragLeave={() => setDragOverLane(null)}
-                    onDrop={(e) => handleDrop(e, lane.status)}
-                    className={cn(
-                      "rounded-xl border p-3 transition-all duration-200",
-                      lane.bgColor,
-                      lane.borderColor,
-                      dragOverLane === lane.status &&
-                        "ring-2 ring-primary/30 border-primary/40",
-                      isThisExpanded ? "flex-1" : "min-h-[100px]"
-                    )}
-                  >
-                    {/* Lane Header */}
-                    <div className="flex items-center justify-between mb-2">
-                      <div className={cn("flex items-center gap-1.5", lane.color)}>
-                        {lane.icon}
-                        <span className="text-xs font-bold uppercase tracking-wider">
-                          {lane.label}
-                        </span>
-                        <span className="text-[10px] font-medium opacity-60">
-                          ({laneTasks.length})
-                        </span>
-                      </div>
-                      {!isExpanded && laneTasks.length > 2 && (
-                        <button
-                          onClick={() => setExpandedLane(lane.status)}
-                          className="text-[10px] font-medium text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
-                        >
-                          Ver todas
-                        </button>
-                      )}
-                    </div>
-
-                    {/* Lane Content */}
-                    {isThisExpanded ? (
-                      // Expanded: vertical list
-                      <div className="flex flex-col gap-2 overflow-y-auto">
-                        {laneTasks.length === 0 && dragOverLane !== lane.status ? (
-                          <p className="text-xs text-muted-foreground/50 text-center py-4">
-                            Nenhuma tarefa
-                          </p>
-                        ) : (
-                          renderLaneTasks(laneTasks, lane.status, true)
-                        )}
-                      </div>
-                    ) : (
-                      // Collapsed: horizontal scroll
-                      <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1">
-                        {laneTasks.length === 0 && dragOverLane !== lane.status ? (
-                          <p className="text-xs text-muted-foreground/50 text-center w-full py-4">
-                            Arraste uma nota aqui
-                          </p>
-                        ) : (
-                          renderLaneTasks(laneTasks, lane.status, false)
-                        )}
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
+                {renderSidebarContent()}
               </div>
             </div>
           </motion.aside>
