@@ -25,6 +25,36 @@ export const createCalendarAction = protectedAction
     return { success: true, calendar };
   });
 
+export const importSharedCalendarAction = protectedAction
+  .schema(
+    z.object({
+      url: z.string().url("URL inválida"),
+      backgroundColor: z.string().optional(),
+    })
+  )
+  .action(async ({ parsedInput, ctx }) => {
+    const calendar = await calendarService.importSharedCalendar(
+      ctx.user.id,
+      parsedInput.url,
+      parsedInput.backgroundColor
+    );
+    revalidatePath("/hub/settings");
+    return { success: true, calendar };
+  });
+
+export const syncCalendarAction = protectedAction
+  .schema(
+    z.object({
+      id: z.string(),
+    })
+  )
+  .action(async ({ parsedInput, ctx }) => {
+    const success = await calendarService.syncCalendar(ctx.user.id, parsedInput.id);
+    revalidatePath("/hub");
+    revalidatePath("/hub/settings");
+    return { success };
+  });
+
 export const deleteCalendarAction = protectedAction
   .schema(z.object({ id: z.string() }))
   .action(async ({ parsedInput, ctx }) => {

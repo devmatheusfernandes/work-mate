@@ -60,6 +60,13 @@ export const deleteNoteAction = protectedAction
     return { success: true };
   });
 
+export const getNotesAction = protectedAction
+  .schema(z.object({}))
+  .action(async ({ ctx }) => {
+    const notes = await notesService.getNotes(ctx.user.id);
+    return { success: true, notes };
+  });
+
 // --- Folder Actions ---
 export const createFolderAction = protectedAction
   .schema(createFolderSchema)

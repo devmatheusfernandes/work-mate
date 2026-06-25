@@ -1,6 +1,7 @@
 import { chatRepository } from "./chat.repository";
 import { notesService } from "@/modules/notes/notes.service";
 import { vectorService } from "@/modules/vector/vector.service";
+import { calendarService } from "@/modules/calendar/calendar.service";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 
 const apiKey = process.env.GEMINI_API_KEY;
@@ -94,6 +95,69 @@ ${notesService.getFormattedContent(n)}`;
       console.error("Erro na busca vetorial RAG:", err);
     }
 
+    // 2.5 Find and fetch direct references (notes, tasks, calendars)
+    let directReferencesContext = "";
+    try {
+      // Matches both note link path: /hub/notes/ID and task link path: /hub/tasks?taskId=ID
+      const noteIds = Array.from(new Set([
+        ...Array.from(content.matchAll(/\/hub\/notes\/([a-zA-Z0-9_-]+)/g)).map(m => m[1]),
+        ...Array.from(content.matchAll(/\/hub\/tasks\?taskId=([a-zA-Z0-9_-]+)/g)).map(m => m[1])
+      ]));
+      
+      const noteRefs: string[] = [];
+      for (const id of noteIds) {
+        try {
+          const note = await notesService.getNote(userId, id);
+          if (note && !note.trashed && !note.archived) {
+            noteRefs.push(`[CONTEÚDO DETALHADO DA NOTA/TAREFA REFERENCIADA: ${note.title} (ID: ${note.id})]
+${notesService.getFormattedContent(note)}`);
+          }
+        } catch (e) {
+          console.error(`Erro ao buscar nota/tarefa referenciada ${id}:`, e);
+        }
+      }
+      if (noteRefs.length > 0) {
+        directReferencesContext += "\n\n=== NOTAS/TAREFAS REFERENCIADAS DIRETAMENTE PELO USUÁRIO ===\n" + noteRefs.join("\n\n");
+      }
+    } catch (err) {
+      console.error("Erro ao processar notas/tarefas referenciadas:", err);
+    }
+
+    try {
+      const calendarIds = Array.from(new Set(
+        Array.from(content.matchAll(/calendar:([a-zA-Z0-9_-]+)/g)).map(m => m[1])
+      ));
+      
+      const calRefs: string[] = [];
+      const allEvents = await calendarService.getEvents(userId);
+      const calendars = await calendarService.getCalendars(userId);
+      for (const id of calendarIds) {
+        try {
+          const cal = calendars.find(c => c.id === id) || await calendarService.getCalendar(userId, id);
+          if (cal) {
+            const calEvents = allEvents.filter(e => e.calendarId === id);
+            const eventsText = calEvents.length > 0
+              ? calEvents.map(e => {
+                  const startStr = new Date(e.start.dateTime).toLocaleString("pt-BR", { timeZone: e.start.timeZone });
+                  const endStr = new Date(e.end.dateTime).toLocaleString("pt-BR", { timeZone: e.end.timeZone });
+                  return `- ${e.summary}: ${startStr} até ${endStr}${e.location ? ` | Local: ${e.location}` : ""}${e.description ? ` | Descrição: ${e.description}` : ""}`;
+                }).join("\n")
+              : "Nenhum compromisso agendado neste calendário.";
+            
+            calRefs.push(`[COMPROMISSOS DO CALENDÁRIO REFERENCIADO: ${cal.summary} (ID: ${cal.id})]
+${eventsText}`);
+          }
+        } catch (e) {
+          console.error(`Erro ao buscar calendário referenciado ${id}:`, e);
+        }
+      }
+      if (calRefs.length > 0) {
+        directReferencesContext += "\n\n=== CALENDÁRIOS REFERENCIADOS DIRETAMENTE PELO USUÁRIO ===\n" + calRefs.join("\n\n");
+      }
+    } catch (err) {
+      console.error("Erro ao processar calendários referenciados:", err);
+    }
+
     // 3. Load active notes & tasks for prompt context summary
     let globalSummaryContext = "";
     try {
@@ -116,6 +180,32 @@ ${notesService.getFormattedContent(n)}`;
       console.error("Erro ao carregar sumário para o prompt:", err);
     }
 
+    // 3.5 Load calendars & events for prompt context
+    let calendarContext = "";
+    try {
+      const calendars = await calendarService.getCalendars(userId);
+      const events = await calendarService.getEvents(userId);
+      
+      const calendarList = calendars.map(c => `- ${c.summary} (${c.sharedUrl ? "Compartilhado/Importado" : "Local"})`).join("\n");
+      
+      let eventsList = "";
+      if (events.length > 0) {
+        const sortedEvents = [...events].sort((a, b) => new Date(a.start.dateTime).getTime() - new Date(b.start.dateTime).getTime());
+        eventsList = sortedEvents.map(e => {
+          const cal = calendars.find(c => c.id === e.calendarId);
+          const startStr = new Date(e.start.dateTime).toLocaleString("pt-BR", { timeZone: e.start.timeZone });
+          const endStr = new Date(e.end.dateTime).toLocaleString("pt-BR", { timeZone: e.end.timeZone });
+          return `- [${cal?.summary || "Agenda"}] ${e.summary}: ${startStr} até ${endStr}${e.location ? ` | Local: ${e.location}` : ""}${e.description ? ` | Descrição: ${e.description}` : ""}`;
+        }).join("\n");
+      } else {
+        eventsList = "Nenhum compromisso agendado.";
+      }
+      
+      calendarContext = `Calendários Ativos:\n${calendarList}\n\nCompromissos:\n${eventsList}`;
+    } catch (err) {
+      console.error("Erro ao carregar contexto de calendário para o prompt:", err);
+    }
+
     // 4. Save the user's message in the database
     const userMsgId = "msg_" + Math.random().toString(36).substring(2, 11);
     await chatRepository.createMessage({
@@ -126,8 +216,11 @@ ${notesService.getFormattedContent(n)}`;
     });
 
     // 5. Build prompt system instructions
+    const systemDateStr = new Date().toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" });
     const systemInstruction = `Você é o Assistente IA do WorkMate, um assistente inteligente integrado ao painel de estudos do usuário.
-Seu objetivo é ajudar o usuário com seus resumos, anotações e organização de tarefas.
+Seu objetivo é ajudar o usuário com seus resumos, anotações, organização de tarefas e compromissos de agenda.
+
+A data e hora atual do sistema (hoje) é: ${systemDateStr} (Horário de Brasília). Use sempre esta data e hora como referência absoluta para interpretar expressões temporais do usuário como "hoje", "amanhã", "ontem", "esta semana" ou "próxima segunda-feira".
 
 INSTRUÇÕES CRICIAIS DE FORMATAÇÃO E RESPOSTA:
 1. Responda em português de forma clara, amigável e objetiva. Use negritos, listas e títulos curtos.
@@ -138,16 +231,21 @@ INSTRUÇÕES CRICIAIS DE FORMATAÇÃO E RESPOSTA:
    - Para Tarefas: [Título da Tarefa](/hub/tasks?taskId=ID_DA_TAREFA)
    - Exemplo: "Vi que a tarefa [Comprar Livro](/hub/tasks?taskId=note_456) ainda está pendente."
 4. Ao falar sobre tarefas, você tem acesso às subtarefas e ao status de conclusão delas. Mostre que sabe quais estão concluídas e quais estão pendentes caso o usuário pergunte.
+5. Você também tem acesso aos compromissos da agenda do usuário (calendários e eventos). Se o usuário perguntar sobre o que ele tem para fazer, reuniões, compromissos em datas específicas ou cronograma, consulte o contexto de calendário fornecido e responda de forma organizada e cronológica.
 
-Abaixo estão as informações reais do usuário (notas e tarefas) para você usar como contexto:
+Abaixo estão as informações reais do usuário (notas, tarefas e compromissos da agenda) para você usar como contexto:
 
 === SUMÁRIO GERAL DE NOTAS E TAREFAS ATIVAS ===
 ${globalSummaryContext || "Nenhuma nota ou tarefa ativa cadastrada."}
 ==============================================
 
+=== CONTEXTO DE CALENDÁRIO E AGENDA ===
+${calendarContext || "Nenhum calendário ou compromisso disponível."}
+=======================================
+
 === CONTEÚDO DETALHADO DE ITENS RELEVANTES ===
 ${relevantNotesContext || "Nenhum conteúdo detalhado adicional relevante encontrado."}
-==============================================`;
+==============================================${directReferencesContext}`;
 
     if (!genAI) {
       throw new Error("Chave de API do Gemini não configurada.");

@@ -5,6 +5,8 @@ import {
   getEventsAction,
   createCalendarAction,
   deleteCalendarAction,
+  importSharedCalendarAction,
+  syncCalendarAction,
 } from "./calendar.actions";
 import { toast } from "sonner";
 
@@ -29,6 +31,8 @@ interface CalendarState {
   
   // Mutations
   addCalendar: (summary: string, backgroundColor: string) => Promise<boolean>;
+  importCalendar: (url: string, backgroundColor: string) => Promise<boolean>;
+  syncCalendar: (id: string) => Promise<boolean>;
   removeCalendar: (id: string) => Promise<boolean>;
 }
 
@@ -115,6 +119,46 @@ export const useCalendarStore = create<CalendarState>((set, get) => ({
       }
     } catch {
       toast.error("Erro ao adicionar agenda.", { id: toastId });
+      return false;
+    }
+  },
+
+  importCalendar: async (url, backgroundColor) => {
+    const toastId = toast.loading("Importando agenda compartilhada...");
+    try {
+      const result = await importSharedCalendarAction({
+        url,
+        backgroundColor,
+      });
+      if (result?.data?.success && result.data.calendar) {
+        toast.success("Agenda importada com sucesso!", { id: toastId });
+        await get().fetchCalendars();
+        await get().fetchEvents();
+        return true;
+      } else {
+        toast.error("Erro ao importar agenda.", { id: toastId });
+        return false;
+      }
+    } catch {
+      toast.error("Erro ao importar agenda.", { id: toastId });
+      return false;
+    }
+  },
+
+  syncCalendar: async (id) => {
+    const toastId = toast.loading("Sincronizando agenda...");
+    try {
+      const result = await syncCalendarAction({ id });
+      if (result?.data?.success) {
+        toast.success("Agenda sincronizada com sucesso!", { id: toastId });
+        await get().fetchEvents();
+        return true;
+      } else {
+        toast.error("Erro ao sincronizar agenda.", { id: toastId });
+        return false;
+      }
+    } catch {
+      toast.error("Erro ao sincronizar agenda.", { id: toastId });
       return false;
     }
   },

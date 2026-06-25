@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { 
   Paperclip, 
@@ -18,6 +19,9 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { useChatStore } from "../chat.store";
 import { Button } from "@/components/ui/button";
+import { useCalendarStore } from "@/modules/calendar/calendar.store";
+import { getNotesAction } from "@/modules/notes/notes.actions";
+import { Note } from "@/modules/notes/notes.schema";
 
 interface ChatInterfaceProps {
   isSidebar?: boolean;
@@ -46,6 +50,7 @@ export function ChatInterface({
   isSidebar = false,
   onNavigateToFullPage,
 }: ChatInterfaceProps) {
+  const router = useRouter();
   const {
     sessions,
     messages,
@@ -69,6 +74,127 @@ export function ChatInterface({
   const [sessionsType, setSessionsType] = useState<"active" | "archived">("active");
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Mention / Reference states
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const [showMentionSuggestions, setShowMentionSuggestions] = useState(false);
+  const [mentionTriggerIndex, setMentionTriggerIndex] = useState(-1);
+  const [mentionSearchText, setMentionSearchText] = useState("");
+  const [mentionType, setMentionType] = useState<"@" | "/">("@");
+  const [availableNotes, setAvailableNotes] = useState<{ id: string; title: string; type: string }[]>([]);
+  const [availableCalendars, setAvailableCalendars] = useState<{ id: string; summary: string }[]>([]);
+  const [activeSuggestionIndex, setActiveSuggestionIndex] = useState(0);
+
+  // Fetch mention context data
+  useEffect(() => {
+    const fetchMentionData = async () => {
+      const storeCals = useCalendarStore.getState().calendars;
+      if (storeCals.length === 0) {
+        await useCalendarStore.getState().fetchCalendars();
+      }
+      setAvailableCalendars(useCalendarStore.getState().calendars);
+
+      try {
+        const res = await getNotesAction({});
+        if (res?.data?.success && res.data.notes) {
+          setAvailableNotes(res.data.notes.filter((n: Note) => !n.trashed && !n.archived));
+        }
+      } catch (err) {
+        console.error("Error fetching notes for mentions:", err);
+      }
+    };
+    
+    fetchMentionData();
+  }, []);
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const value = e.target.value;
+    setInputValue(value);
+
+    const selectionStart = e.target.selectionStart;
+    const textBeforeCursor = value.substring(0, selectionStart);
+    
+    const lastAtIdx = textBeforeCursor.lastIndexOf("@");
+    const lastSlashIdx = textBeforeCursor.lastIndexOf("/");
+    
+    let activeTriggerIdx = -1;
+    let activeType: "@" | "/" = "@";
+
+    if (lastAtIdx > lastSlashIdx) {
+      activeTriggerIdx = lastAtIdx;
+      activeType = "@";
+    } else if (lastSlashIdx > lastAtIdx) {
+      activeTriggerIdx = lastSlashIdx;
+      activeType = "/";
+    }
+
+    if (activeTriggerIdx !== -1) {
+      const textAfterTrigger = textBeforeCursor.substring(activeTriggerIdx + 1);
+      const charBeforeTrigger = activeTriggerIdx > 0 ? textBeforeCursor[activeTriggerIdx - 1] : "";
+      const isValidTrigger = activeTriggerIdx === 0 || /\s/.test(charBeforeTrigger);
+      
+      if (isValidTrigger && !textAfterTrigger.includes("\n")) {
+        setShowMentionSuggestions(true);
+        setMentionTriggerIndex(activeTriggerIdx);
+        setMentionType(activeType);
+        setMentionSearchText(textAfterTrigger);
+        setActiveSuggestionIndex(0);
+        return;
+      }
+    }
+
+    setShowMentionSuggestions(false);
+  };
+
+  const handleSelectMention = (item: { id: string; title: string; type: string }) => {
+    const textBeforeMention = inputValue.substring(0, mentionTriggerIndex);
+    const textAfterMention = inputValue.substring(mentionTriggerIndex + mentionSearchText.length + 1);
+    
+    let formattedMention = "";
+    if (item.type === "calendar") {
+      formattedMention = `[Agenda: ${item.title}](calendar:${item.id}) `;
+    } else if (item.type === "task") {
+      formattedMention = `[Tarefa: ${item.title}](/hub/tasks?taskId=${item.id}) `;
+    } else {
+      formattedMention = `[Nota: ${item.title}](/hub/notes/${item.id}) `;
+    }
+
+    const newValue = textBeforeMention + formattedMention + textAfterMention;
+    setInputValue(newValue);
+    setShowMentionSuggestions(false);
+    
+    if (textareaRef.current) {
+      textareaRef.current.focus();
+      const newCursorPos = textBeforeMention.length + formattedMention.length;
+      setTimeout(() => {
+        if (textareaRef.current) {
+          textareaRef.current.setSelectionRange(newCursorPos, newCursorPos);
+        }
+      }, 0);
+    }
+  };
+
+  const filteredSuggestions = (() => {
+    if (mentionType === "@") {
+      const allNotesAndTasks = availableNotes.map(n => ({
+        id: n.id,
+        title: n.title,
+        type: n.type,
+      }));
+      return allNotesAndTasks.filter(item => 
+        item.title.toLowerCase().includes(mentionSearchText.toLowerCase())
+      );
+    } else {
+      const allCalendars = availableCalendars.map(c => ({
+        id: c.id,
+        title: c.summary,
+        type: "calendar",
+      }));
+      return allCalendars.filter(item =>
+        item.title.toLowerCase().includes(mentionSearchText.toLowerCase())
+      );
+    }
+  })();
 
   // Load sessions list on mount and when sessionsType changes
   useEffect(() => {
@@ -98,6 +224,29 @@ export function ChatInterface({
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (showMentionSuggestions && filteredSuggestions.length > 0) {
+      if (e.key === "ArrowDown") {
+        e.preventDefault();
+        setActiveSuggestionIndex((prev) => (prev + 1) % filteredSuggestions.length);
+        return;
+      }
+      if (e.key === "ArrowUp") {
+        e.preventDefault();
+        setActiveSuggestionIndex((prev) => (prev - 1 + filteredSuggestions.length) % filteredSuggestions.length);
+        return;
+      }
+      if (e.key === "Enter") {
+        e.preventDefault();
+        handleSelectMention(filteredSuggestions[activeSuggestionIndex]);
+        return;
+      }
+      if (e.key === "Escape") {
+        e.preventDefault();
+        setShowMentionSuggestions(false);
+        return;
+      }
+    }
+
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
       handleSend(inputValue);
@@ -530,6 +679,26 @@ export function ChatInterface({
                           </div>
                         )}
                         <div
+                          onClick={(e) => {
+                            const target = e.target as HTMLElement;
+                            if (target.tagName === "A") {
+                              const href = target.getAttribute("href");
+                              if (href) {
+                                if (href.startsWith("calendar:")) {
+                                  e.preventDefault();
+                                  const calId = href.split(":")[1];
+                                  useCalendarStore.getState().setSidebarOpen(true);
+                                  const activeIds = useCalendarStore.getState().activeCalendarIds;
+                                  if (!activeIds.includes(calId)) {
+                                    useCalendarStore.getState().toggleCalendarFilter(calId);
+                                  }
+                                } else if (href.startsWith("/hub/")) {
+                                  e.preventDefault();
+                                  router.push(href);
+                                }
+                              }
+                            }
+                          }}
                           className={cn(
                             "max-w-[85%] rounded-2xl px-4 py-2.5 border text-foreground flex flex-col",
                             isUser
@@ -612,7 +781,37 @@ export function ChatInterface({
               !hasMessages ? "absolute bottom-[20%] left-0 right-0 py-0" : "border-t border-border/20"
             )}
           >
-            <div className="w-full max-w-xl flex flex-col items-center">
+            <div className="w-full max-w-xl flex flex-col items-center relative">
+              {/* Autocomplete Suggestions Popover */}
+              {showMentionSuggestions && filteredSuggestions.length > 0 && (
+                <div className="absolute bottom-[110%] left-0 right-0 max-h-48 overflow-y-auto bg-card/95 backdrop-blur-md border border-border/40 rounded-xl p-1.5 flex flex-col gap-0.5 z-50 animate-in fade-in slide-in-from-bottom-2 duration-150 custom-scrollbar select-none">
+                  {filteredSuggestions.map((item, idx) => (
+                    <button
+                      key={item.id + idx}
+                      type="button"
+                      onClick={() => handleSelectMention(item)}
+                      className={cn(
+                        "w-full flex items-center justify-between p-2 rounded-lg text-left text-xs transition-colors cursor-pointer",
+                        idx === activeSuggestionIndex
+                          ? "bg-primary/15 text-primary font-medium"
+                          : "text-foreground hover:bg-muted/60"
+                      )}
+                    >
+                      <div className="flex items-center gap-2 truncate">
+                        <span>{item.type === "calendar" ? "📅" : item.type === "task" ? "🎯" : "📝"}</span>
+                        <span className="font-semibold truncate">{item.title}</span>
+                      </div>
+                      <span className={cn(
+                        "text-[10px] uppercase tracking-wider shrink-0 pl-3",
+                        idx === activeSuggestionIndex ? "text-primary/80" : "text-muted-foreground"
+                      )}>
+                        {item.type === "calendar" ? "Agenda" : item.type === "task" ? "Tarefa" : "Nota"}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              )}
+
               <motion.div
                 layout
                 transition={{ type: "spring", stiffness: 350, damping: 30 }}
@@ -648,13 +847,17 @@ export function ChatInterface({
                 />
 
                 <textarea
+                  ref={textareaRef}
                   value={inputValue}
-                  onChange={(e) => setInputValue(e.target.value)}
+                  onChange={handleInputChange}
                   onKeyDown={handleKeyDown}
                   onFocus={() => setIsFocused(true)}
-                  onBlur={() => setIsFocused(false)}
+                  onBlur={() => {
+                    setIsFocused(false);
+                    setTimeout(() => setShowMentionSuggestions(false), 200);
+                  }}
                   disabled={isGenerating}
-                  placeholder="Pergunte qualquer coisa..."
+                  placeholder="Digite @ para notas/tarefas ou / para agendas..."
                   rows={1}
                   className="flex-1 bg-transparent border-none outline-none resize-none no-scrollbar text-sm placeholder:text-muted-foreground/60 text-foreground py-1.5 px-1 min-h-[24px] max-h-[120px] focus:ring-0 leading-relaxed"
                 />

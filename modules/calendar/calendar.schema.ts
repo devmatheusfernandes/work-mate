@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { pgTable, text, timestamp } from "drizzle-orm/pg-core";
 
 // --- Google CalendarList Resource ---
 export const calendarSchema = z.object({
@@ -7,6 +8,7 @@ export const calendarSchema = z.object({
   summary: z.string().min(1, "O nome do calendário não pode ser vazio").max(50, "O nome é muito longo"),
   backgroundColor: z.string().default("bg-blue-500"),
   foregroundColor: z.string().default("text-white"),
+  sharedUrl: z.string().optional().nullable(),
   createdAt: z.string(),
   updatedAt: z.string(),
 });
@@ -53,3 +55,34 @@ export const createCalendarEventSchema = calendarEventSchema.omit({
 });
 
 export type CreateCalendarEventDTO = z.infer<typeof createCalendarEventSchema>;
+
+// --- Drizzle Table Schemas ---
+
+export const calendarsTable = pgTable("calendars", {
+  userId: text("user_id").notNull(),
+  id: text("id").primaryKey(),
+  summary: text("summary").notNull(),
+  backgroundColor: text("background_color").notNull().default("bg-blue-500"),
+  foregroundColor: text("foreground_color").notNull().default("text-white"),
+  sharedUrl: text("shared_url"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+export const eventsTable = pgTable("events", {
+  userId: text("user_id").notNull(),
+  id: text("id").primaryKey(),
+  calendarId: text("calendar_id")
+    .references(() => calendarsTable.id, { onDelete: "cascade" })
+    .notNull(),
+  summary: text("summary").notNull(),
+  description: text("description"),
+  location: text("location"),
+  startDateTime: timestamp("start_date_time").notNull(),
+  startTimeZone: text("start_time_zone").notNull().default("America/Sao_Paulo"),
+  endDateTime: timestamp("end_date_time").notNull(),
+  endTimeZone: text("end_time_zone").notNull().default("America/Sao_Paulo"),
+  status: text("status").notNull().default("confirmed"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});

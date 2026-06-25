@@ -22,6 +22,8 @@ import {
   Moon,
   Monitor,
   Check,
+  RefreshCw,
+  Globe,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -58,11 +60,13 @@ export function SettingsContainer({ initialCalendars, user }: SettingsContainerP
   const [activeTab, setActiveTab] = useState<"geral" | "calendario">("geral");
   const { setTheme } = useTheme();
   const { themeColor, setThemeColor, mode, setMode } = useAppearanceStore();
-  const { calendars, addCalendar, removeCalendar } = useCalendarStore();
+  const { calendars, addCalendar, removeCalendar, importCalendar, syncCalendar } = useCalendarStore();
   
   // Create Calendar Form State
   const [newCalendarName, setNewCalendarName] = useState("");
   const [selectedColor, setSelectedColor] = useState("bg-blue-500");
+  const [sharedUrl, setSharedUrl] = useState("");
+  const [activeFormTab, setActiveFormTab] = useState<"local" | "shared">("local");
 
   useEffect(() => {
     // Seed/sync store with initial server data
@@ -81,6 +85,16 @@ export function SettingsContainer({ initialCalendars, user }: SettingsContainerP
     const success = await addCalendar(newCalendarName.trim(), selectedColor);
     if (success) {
       setNewCalendarName("");
+    }
+  };
+
+  const handleImportCalendar = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!sharedUrl.trim()) return;
+    
+    const success = await importCalendar(sharedUrl.trim(), selectedColor);
+    if (success) {
+      setSharedUrl("");
     }
   };
 
@@ -195,59 +209,139 @@ export function SettingsContainer({ initialCalendars, user }: SettingsContainerP
           </div>
         ) : (
           <div className="space-y-6">
-            {/* Add Calendar Form */}
+            {/* Add/Import Calendar Form */}
             <div className="card p-5 space-y-4">
               <h3 className="text-sm font-bold uppercase tracking-wider text-muted-foreground/60">
-                Criar Novo Calendário
+                Gerenciar Calendários
               </h3>
-              <form onSubmit={handleAddCalendar} className="space-y-4 max-w-xl">
-                <div className="flex flex-col gap-1.5">
-                  <label className="text-[10px] font-bold text-muted-foreground">
-                    Nome do Calendário
-                  </label>
-                  <input
-                    type="text"
-                    value={newCalendarName}
-                    onChange={(e) => setNewCalendarName(e.target.value)}
-                    placeholder="Ex: Estudos, Projetos, Família..."
-                    className="input h-9 px-3 text-xs w-full focus:outline-none"
-                  />
-                </div>
-
-                <div className="flex flex-col gap-1.5">
-                  <label className="text-[10px] font-bold text-muted-foreground">
-                    Cor da Agenda
-                  </label>
-                  <div className="flex gap-2 flex-wrap">
-                    {PRESET_CALENDAR_COLORS.map((color) => {
-                      const active = selectedColor === color;
-                      return (
-                        <button
-                          key={color}
-                          type="button"
-                          onClick={() => setSelectedColor(color)}
-                          className={cn(
-                            "size-7 rounded-full flex items-center justify-center transition-all cursor-pointer",
-                            color,
-                            active ? "ring-4 ring-primary/20 scale-105" : "hover:scale-105"
-                          )}
-                        >
-                          {active && <Check className="size-3.5 text-white" />}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-
-                <Button
-                  type="submit"
-                  disabled={!newCalendarName.trim()}
-                  className="w-full sm:w-auto text-xs font-semibold"
+              
+              <div className="flex gap-2 border-b border-border/10 pb-3">
+                <button
+                  type="button"
+                  onClick={() => setActiveFormTab("local")}
+                  className={cn(
+                    "px-3 py-1.5 text-xs font-semibold rounded-lg transition-all cursor-pointer",
+                    activeFormTab === "local"
+                      ? "bg-primary text-primary-foreground"
+                      : "text-muted-foreground hover:bg-muted/50 hover:text-foreground"
+                  )}
                 >
-                  <Plus className="size-3.5 mr-1" />
-                  Criar Calendário
-                </Button>
-              </form>
+                  Criar Local
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setActiveFormTab("shared")}
+                  className={cn(
+                    "px-3 py-1.5 text-xs font-semibold rounded-lg transition-all cursor-pointer",
+                    activeFormTab === "shared"
+                      ? "bg-primary text-primary-foreground"
+                      : "text-muted-foreground hover:bg-muted/50 hover:text-foreground"
+                  )}
+                >
+                  Importar Compartilhado (.ics)
+                </button>
+              </div>
+
+              {activeFormTab === "local" ? (
+                <form onSubmit={handleAddCalendar} className="space-y-4 max-w-xl">
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-[10px] font-bold text-muted-foreground">
+                      Nome do Calendário
+                    </label>
+                    <input
+                      type="text"
+                      value={newCalendarName}
+                      onChange={(e) => setNewCalendarName(e.target.value)}
+                      placeholder="Ex: Estudos, Projetos, Família..."
+                      className="input h-9 px-3 text-xs w-full focus:outline-none"
+                    />
+                  </div>
+
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-[10px] font-bold text-muted-foreground">
+                      Cor da Agenda
+                    </label>
+                    <div className="flex gap-2 flex-wrap">
+                      {PRESET_CALENDAR_COLORS.map((color) => {
+                        const active = selectedColor === color;
+                        return (
+                          <button
+                            key={color}
+                            type="button"
+                            onClick={() => setSelectedColor(color)}
+                            className={cn(
+                              "size-7 rounded-full flex items-center justify-center transition-all cursor-pointer",
+                              color,
+                              active ? "ring-4 ring-primary/20 scale-105" : "hover:scale-105"
+                            )}
+                          >
+                            {active && <Check className="size-3.5 text-white" />}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  <Button
+                    type="submit"
+                    disabled={!newCalendarName.trim()}
+                    className="w-full sm:w-auto text-xs font-semibold"
+                  >
+                    <Plus className="size-3.5 mr-1" />
+                    Criar Calendário
+                  </Button>
+                </form>
+              ) : (
+                <form onSubmit={handleImportCalendar} className="space-y-4 max-w-xl">
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-[10px] font-bold text-muted-foreground">
+                      Link do Calendário Compartilhado (.ics / webcal)
+                    </label>
+                    <input
+                      type="url"
+                      value={sharedUrl}
+                      onChange={(e) => setSharedUrl(e.target.value)}
+                      placeholder="https://calendar.google.com/calendar/ical/.../basic.ics"
+                      className="input h-9 px-3 text-xs w-full focus:outline-none"
+                      required
+                    />
+                  </div>
+
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-[10px] font-bold text-muted-foreground">
+                      Cor da Agenda
+                    </label>
+                    <div className="flex gap-2 flex-wrap">
+                      {PRESET_CALENDAR_COLORS.map((color) => {
+                        const active = selectedColor === color;
+                        return (
+                          <button
+                            key={color}
+                            type="button"
+                            onClick={() => setSelectedColor(color)}
+                            className={cn(
+                              "size-7 rounded-full flex items-center justify-center transition-all cursor-pointer",
+                              color,
+                              active ? "ring-4 ring-primary/20 scale-105" : "hover:scale-105"
+                            )}
+                          >
+                            {active && <Check className="size-3.5 text-white" />}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  <Button
+                    type="submit"
+                    disabled={!sharedUrl.trim()}
+                    className="w-full sm:w-auto text-xs font-semibold"
+                  >
+                    <Plus className="size-3.5 mr-1" />
+                    Importar Calendário
+                  </Button>
+                </form>
+              )}
             </div>
 
             {/* List Calendars */}
@@ -281,18 +375,36 @@ export function SettingsContainer({ initialCalendars, user }: SettingsContainerP
                           <h4 className="text-xs font-bold text-foreground truncate max-w-[150px]">
                             {cal.summary}
                           </h4>
-                          <p className="text-[9px] text-muted-foreground">
-                            Google API Compatible
+                          <p className="text-[9px] text-muted-foreground flex items-center gap-1">
+                            {cal.sharedUrl ? (
+                              <>
+                                <Globe className="size-2.5 text-primary" />
+                                Compartilhado (iCal)
+                              </>
+                            ) : (
+                              "Agenda Local"
+                            )}
                           </p>
                         </div>
                       </div>
-                      <button
-                        onClick={() => removeCalendar(cal.id)}
-                        className="p-1 rounded text-muted-foreground hover:text-destructive hover:bg-muted/50 transition-colors cursor-pointer"
-                        title="Excluir Calendário"
-                      >
-                        <Trash2 className="size-3.5" />
-                      </button>
+                      <div className="flex items-center gap-1">
+                        {cal.sharedUrl && (
+                          <button
+                            onClick={() => syncCalendar(cal.id)}
+                            className="p-1 rounded text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors cursor-pointer"
+                            title="Sincronizar Eventos"
+                          >
+                            <RefreshCw className="size-3.5" />
+                          </button>
+                        )}
+                        <button
+                          onClick={() => removeCalendar(cal.id)}
+                          className="p-1 rounded text-muted-foreground hover:text-destructive hover:bg-muted/50 transition-colors cursor-pointer"
+                          title="Excluir Calendário"
+                        >
+                          <Trash2 className="size-3.5" />
+                        </button>
+                      </div>
                     </div>
                   ))}
                 </div>
