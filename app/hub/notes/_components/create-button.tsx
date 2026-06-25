@@ -866,9 +866,12 @@ export function CreateButton({
           className="flex size-14 items-center justify-center rounded-full bg-primary text-primary-foreground hover:bg-primary/95 cursor-pointer border-none"
         >
           {/* Long-press progress ring */}
-          <svg
+          <motion.svg
             className="absolute inset-0 size-full -rotate-90 pointer-events-none"
             viewBox="0 0 56 56"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: isPressing ? 1 : 0 }}
+            transition={{ duration: 0.15 }}
           >
             <motion.circle
               cx="28"
@@ -882,7 +885,7 @@ export function CreateButton({
               pathLength={1}
               style={{ pathLength: pressProgress }}
             />
-          </svg>
+          </motion.svg>
 
           {isMenuBusy ? (
             <Loader2 className="size-6 animate-spin" />

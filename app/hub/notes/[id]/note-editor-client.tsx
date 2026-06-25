@@ -18,10 +18,14 @@ export function NoteEditorClient({ note }: NoteEditorClientProps) {
   const [prevNote, setPrevNote] = useState(note);
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Sync state during render if note changes externally
-  if (note.id !== prevNote.id || note.updatedAt !== prevNote.updatedAt) {
+  // Sync state during render if note changes externally (e.g. user switched notes)
+  if (note.id !== prevNote.id) {
     setNoteTitle(note.title);
     setNoteContent(note.content || "");
+    setPrevNote(note);
+  } else if (note.updatedAt !== prevNote.updatedAt) {
+    // Keep prevNote in sync with the server prop to avoid infinite checks,
+    // but do NOT overwrite the local editor state if the note is the same.
     setPrevNote(note);
   }
 
@@ -61,7 +65,7 @@ export function NoteEditorClient({ note }: NoteEditorClientProps) {
         const res = await updateNoteAction({ id: note.id, updates });
         if (res?.data?.success) {
           setSaveStatus("saved");
-          await saveOfflineItem("notes", updatedNote);
+          await saveOfflineItem("notes", res.data.note || updatedNote);
         } else {
           setSaveStatus("error");
         }
