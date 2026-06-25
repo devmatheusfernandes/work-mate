@@ -276,7 +276,7 @@ export function NotesDashboard({
     : [];
 
   return (
-    <div className="flex h-full min-h-screen">
+    <div className="flex h-full">
       {/* Main content area */}
       <div className="flex flex-col flex-1 min-w-0 pb-24">
         {/* Header with Search integration */}

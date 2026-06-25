@@ -301,7 +301,10 @@ export function ChatInterface({
   };
 
   return (
-    <div className="flex h-full w-full bg-background overflow-hidden relative">
+    <div className={cn(
+      "flex h-full w-full overflow-hidden relative",
+      isSidebar ? "bg-transparent" : "bg-background"
+    )}>
       {/* 1. COLLAPSIBLE CONVERSATION HISTORY SIDEBAR */}
       <AnimatePresence>
         {isSidebarOpen && !isSidebar && (
@@ -539,8 +542,8 @@ export function ChatInterface({
       <div className="flex-1 flex flex-col min-w-0 h-full">
         {/* Top Header */}
         <div className={cn(
-          "flex items-center justify-between h-12 border-b border-border/30 shrink-0 bg-background/80 backdrop-blur-md z-10 px-4",
-          isSidebar && "pl-11"
+          "flex items-center justify-between h-12 border-b border-border/30 shrink-0 backdrop-blur-md z-10 px-4",
+          isSidebar ? "bg-card/80 pl-11" : "bg-background/80"
         )}>
           <div className="flex items-center gap-2">
             {!isSidebar && (
@@ -777,7 +780,10 @@ export function ChatInterface({
             layout
             transition={{ type: "spring", stiffness: 350, damping: 30 }}
             className={cn(
-              "p-4 bg-gradient-to-t from-background via-background/95 to-transparent shrink-0 z-10 w-full flex justify-center",
+              "p-4 shrink-0 z-10 w-full flex justify-center",
+              isSidebar 
+                ? "bg-gradient-to-t from-card via-card/95 to-transparent" 
+                : "bg-gradient-to-t from-background via-background/95 to-transparent",
               !hasMessages ? "absolute bottom-[20%] left-0 right-0 py-0" : "border-t border-border/20"
             )}
           >

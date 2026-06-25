@@ -81,7 +81,7 @@ export function ChatSidebar() {
             className="relative h-full overflow-hidden shrink-0"
           >
             <div className="h-full w-full pl-[2px] py-2 pr-2">
-              <div className="h-full w-[380px] bg-card rounded-xl overflow-hidden flex flex-col relative">
+              <div className="h-full w-[380px] bg-card rounded-xl overflow-hidden flex flex-col relative border border-border/20">
                 {/* Header Close Arrow */}
                 <div className="absolute top-2.5 left-2 z-20">
                   <button

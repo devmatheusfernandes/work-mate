@@ -6,7 +6,6 @@ import {
   Loader2,
   CheckCircle2,
   ChevronRight,
-  ChevronLeft,
   ArrowLeft,
   Calendar,
   GripVertical,
@@ -327,7 +326,7 @@ export function TasksSidebar({
           }}
           className="fixed right-0 top-1/2 -translate-y-1/2 z-30 flex items-center justify-center w-6 h-16 bg-muted/80 hover:bg-muted border border-r-0 border-border/50 rounded-l-lg transition-all cursor-pointer"
         >
-          <ChevronLeft className="size-4 text-muted-foreground" />
+          <CheckCircle2 className="size-4 text-primary" />
         </button>
       )}
 
@@ -342,9 +341,14 @@ export function TasksSidebar({
             }}
             exit={{ width: 0, opacity: 0 }}
             transition={{ type: "spring", bounce: 0, duration: 0.35 }}
-            className="shrink-0 h-full border-l border-border/50 bg-background overflow-hidden flex flex-col"
+            className="relative h-full overflow-hidden shrink-0"
             onDragOver={handleDragOver}
           >
+            <div className="h-full w-full">
+              <div className={cn(
+                "h-full bg-card rounded-xl overflow-hidden flex flex-col relative border border-border/20",
+                isExpanded ? "w-[470px]" : "w-full"
+              )}>
             {/* Sidebar Header */}
             <div className="flex items-center justify-between px-4 h-12 border-b border-border/30 shrink-0">
               {isExpanded ? (
@@ -443,6 +447,8 @@ export function TasksSidebar({
                   </div>
                 );
               })}
+            </div>
+              </div>
             </div>
           </motion.aside>
         )}
