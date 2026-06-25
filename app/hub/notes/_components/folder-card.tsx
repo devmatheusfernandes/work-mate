@@ -235,32 +235,32 @@ export function FolderCard({
         isDragOver && "ring-2 ring-primary/30 border-primary/40 bg-primary/5"
       )}
     >
-      {/* Selection Overlay */}
-      <div
-        onClick={(e) => {
-          e.stopPropagation();
-          onToggleSelect();
-        }}
-        className={cn(
-          "absolute top-1/2 left-3 z-15 flex size-6 -translate-y-1/2 items-center justify-center rounded-full border border-border/85 bg-background/95 transition-all",
-          isSelected
-            ? "opacity-100 scale-100 border-primary bg-primary text-primary-foreground"
-            : "opacity-0 scale-95 group-hover:opacity-100 group-hover:scale-100"
-        )}
-      >
-        {isSelected && <span className="size-2 rounded-full bg-white" />}
-      </div>
+      {/* Icon or Selection Wrapper */}
+      <div className="size-10 flex shrink-0 items-center justify-center relative">
+        {/* Selection Circle */}
+        <div
+          onClick={(e) => {
+            e.stopPropagation();
+            onToggleSelect();
+          }}
+          className={cn(
+            "absolute inset-0 m-auto z-15 flex size-6 items-center justify-center rounded-full border border-border/85 bg-background/95 transition-all cursor-pointer",
+            isSelected
+              ? "opacity-100 scale-100 border-primary bg-primary text-primary-foreground"
+              : "opacity-0 scale-95 group-hover:opacity-100 group-hover:scale-100"
+          )}
+        >
+          {isSelected && <span className="size-2 rounded-full bg-white" />}
+        </div>
 
-      {/* Folder Icon wrapper */}
-      <div className={cn(
-        "size-10 flex shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary transition-all",
-        isSelected ? "opacity-0" : "group-hover:opacity-0"
-      )}>
-        <FolderIcon className="size-5 fill-current" />
+        {/* Folder Icon */}
+        <div className={cn(
+          "size-10 flex items-center justify-center rounded-lg bg-primary/10 text-primary transition-all duration-200",
+          isSelected ? "opacity-0 scale-75" : "group-hover:opacity-0 group-hover:scale-75"
+        )}>
+          <FolderIcon className="size-5 fill-current" />
+        </div>
       </div>
-
-      {/* Spacing placeholder when selection is hovered */}
-      <div className={cn("w-10 shrink-0", isSelected ? "block" : "hidden group-hover:block")} />
 
       {/* Folder info */}
       <div className="flex-1 min-w-0 pr-4">

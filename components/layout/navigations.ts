@@ -18,7 +18,6 @@ export const sidebarNavItems: MenuItemType[] = [
     href: "/hub/archive",
     label: "Arquivadas",
     Icon: CheckSquare,
-    badgeCount: 3,
   },
   {
     href: "/hub/chat",
