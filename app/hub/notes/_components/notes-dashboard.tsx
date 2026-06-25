@@ -1,6 +1,7 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, useCallback } from "react";
+import { motion } from "framer-motion";
 import { Folder, Note, Tag } from "@/modules/notes/notes.schema";
 import { Header, type HeaderAction } from "@/components/layout/header";
 import { TagChips } from "./tag-chips";
@@ -34,9 +35,43 @@ export function NotesDashboard({
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const { isMobile } = useDevice();
 
+  const [localNotes, setLocalNotes] = useState(notes);
+  const [prevNotes, setPrevNotes] = useState(notes);
+  const [isDragOverGrid, setIsDragOverGrid] = useState(false);
+
+  if (notes !== prevNotes) {
+    setLocalNotes(notes);
+    setPrevNotes(notes);
+  }
+
   // Bulk Selection States
   const [selectedNoteIds, setSelectedNoteIds] = useState<Set<string>>(new Set());
   const [selectedFolderIds, setSelectedFolderIds] = useState<Set<string>>(new Set());
+
+  const handleUpdateNoteOptimistic = useCallback(
+    async (
+      id: string,
+      updates: Partial<Note>,
+      apiCall: () => Promise<{ data?: { success?: boolean } } | undefined>
+    ) => {
+      const prev = [...localNotes];
+      setLocalNotes((current) =>
+        current.map((n) => (n.id === id ? ({ ...n, ...updates } as Note) : n))
+      );
+      try {
+        const result = await apiCall();
+        if (!result?.data?.success) {
+          setLocalNotes(prev);
+          toast.error("Erro ao sincronizar alteração.");
+        }
+      } catch (err) {
+        console.error(err);
+        setLocalNotes(prev);
+        toast.error("Erro de conexão ao salvar alteração.");
+      }
+    },
+    [localNotes]
+  );
 
   // Derive current folder details
   const currentFolder = useMemo(() => {
@@ -55,8 +90,8 @@ export function NotesDashboard({
 
   // Separate tasks from notes
   const allTasks = useMemo(() => {
-    return notes.filter((n) => n.type === "task" && !n.archived && !n.trashed);
-  }, [notes]);
+    return localNotes.filter((n) => n.type === "task" && !n.archived && !n.trashed);
+  }, [localNotes]);
 
   // Filter folders and notes inside active folder (exclude tasks)
   const displayedFolders = useMemo(() => {
@@ -66,14 +101,14 @@ export function NotesDashboard({
   }, [folders, activeFolderId]);
 
   const displayedNotes = useMemo(() => {
-    return notes.filter(
+    return localNotes.filter(
       (n) =>
         n.folderId === activeFolderId &&
         !n.archived &&
         !n.trashed &&
         n.type !== "task"
     );
-  }, [notes, activeFolderId]);
+  }, [localNotes, activeFolderId]);
 
   // Filter notes by selected tag
   const tagFilteredNotes = useMemo(() => {
@@ -202,30 +237,32 @@ export function NotesDashboard({
     const [type, id] = data.split(":");
     if (type !== "task" || !id) return;
 
-    const toastId = toast.loading("Convertendo tarefa em nota...");
-    try {
-      const result = await updateNoteAction({
-        id,
-        updates: {
-          type: "note",
-          taskStatus: null,
-          taskDeadline: null,
-          taskSubtasks: [],
-          taskShouldNotify: false,
-          folderId: activeFolderId,
-        },
-      });
-      if (result?.data?.success) {
-        toast.success("Tarefa convertida em nota!", { id: toastId });
-      } else {
-        toast.error("Erro ao converter.", { id: toastId });
-      }
-    } catch {
-      toast.error("Erro ao converter.", { id: toastId });
-    }
+    handleUpdateNoteOptimistic(
+      id,
+      {
+        type: "note",
+        taskStatus: null,
+        taskDeadline: null,
+        taskSubtasks: [],
+        taskShouldNotify: false,
+        folderId: activeFolderId,
+      },
+      () =>
+        updateNoteAction({
+          id,
+          updates: {
+            type: "note",
+            taskStatus: null,
+            taskDeadline: null,
+            taskSubtasks: [],
+            taskShouldNotify: false,
+            folderId: activeFolderId,
+          },
+        })
+    );
   };
 
-  const hasItems = queryFilteredFolders.length > 0 || queryFilteredNotes.length > 0;
+  const hasItems = queryFilteredFolders.length > 0 || queryFilteredNotes.length > 0 || isDragOverGrid;
 
   // Header actions — mobile Kanban button
   const headerActions: HeaderAction[] = isMobile
@@ -254,8 +291,17 @@ export function NotesDashboard({
 
         <main
           className="container flex-1 py-6 flex flex-col gap-6"
-          onDragOver={(e) => e.preventDefault()}
-          onDrop={handleGridDrop}
+          onDragOver={(e) => {
+            e.preventDefault();
+            if (e.dataTransfer.types.includes("text/plain")) {
+              setIsDragOverGrid(true);
+            }
+          }}
+          onDragLeave={() => setIsDragOverGrid(false)}
+          onDrop={(e) => {
+            setIsDragOverGrid(false);
+            handleGridDrop(e);
+          }}
         >
           {/* Tags & Search Row */}
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 w-full">
@@ -316,22 +362,41 @@ export function NotesDashboard({
                 )}
 
                 {/* Notes Section */}
-                {queryFilteredNotes.length > 0 && (
+                {(queryFilteredNotes.length > 0 || isDragOverGrid) && (
                   <div className="flex flex-col gap-3">
                     <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground/60">
-                      Notas e Arquivos ({queryFilteredNotes.length})
+                      Notas e Arquivos ({queryFilteredNotes.length + (isDragOverGrid ? 1 : 0)})
                     </div>
                     <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
                       {queryFilteredNotes.map((note) => (
-                        <NoteCard
+                        <motion.div
                           key={note.id}
-                          note={note}
-                          searchQuery={searchQuery}
-                          isSelected={selectedNoteIds.has(note.id)}
-                          onToggleSelect={() => toggleSelectNote(note.id)}
-                          isSelectionActive={isSelectionActive}
-                        />
+                          layout
+                          transition={{ type: "spring", stiffness: 200, damping: 24 }}
+                        >
+                          <NoteCard
+                            note={note}
+                            searchQuery={searchQuery}
+                            isSelected={selectedNoteIds.has(note.id)}
+                            onToggleSelect={() => toggleSelectNote(note.id)}
+                            isSelectionActive={isSelectionActive}
+                          />
+                        </motion.div>
                       ))}
+                      {isDragOverGrid && (
+                        <motion.div
+                          key="grid-placeholder"
+                          layout
+                          initial={{ opacity: 0, scale: 0.95 }}
+                          animate={{ opacity: 1, scale: 1 }}
+                          exit={{ opacity: 0, scale: 0.95 }}
+                          transition={{ type: "spring", stiffness: 200, damping: 24 }}
+                          className="rounded-xl border-2 border-dashed border-primary/30 bg-primary/5 animate-pulse p-4 min-h-[160px] flex flex-col justify-center items-center text-primary/40 text-xs font-semibold"
+                        >
+                          <FileText className="size-6 mb-1.5 opacity-60" />
+                          Solte para converter em Nota
+                        </motion.div>
+                      )}
                     </div>
                   </div>
                 )}
@@ -363,6 +428,7 @@ export function NotesDashboard({
           onDragOverSidebar={() => {
             if (!sidebarOpen) setSidebarOpen(true);
           }}
+          onUpdateNoteOptimistic={handleUpdateNoteOptimistic}
         />
       )}
     </div>

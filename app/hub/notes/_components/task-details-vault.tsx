@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useCallback } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
 import { updateNoteAction } from "@/modules/notes/notes.actions";
 import {
@@ -20,13 +21,12 @@ import {
   Vault,
   VaultContent,
   VaultHeader,
-  VaultTitle,
   VaultBody,
-  VaultFooter,
-  VaultPrimaryButton,
 } from "@/components/ui/vault";
 import type { Note, TaskStatus, Subtask } from "@/modules/notes/notes.schema";
 import Link from "next/link";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 
 interface TaskDetailsVaultProps {
   task: Note;
@@ -58,6 +58,48 @@ const STATUS_CONFIG: Record<
   },
 };
 
+function AnimatedCheckbox({ checked, onChange }: { checked: boolean; onChange: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onChange}
+      className={cn(
+        "shrink-0 size-5 rounded-md border flex items-center justify-center transition-colors cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-primary/50",
+        checked
+          ? "bg-primary border-primary"
+          : "border-border/80 hover:border-primary/50 bg-transparent"
+      )}
+    >
+      <motion.div
+        initial={false}
+        animate={checked ? "checked" : "unchecked"}
+        variants={{
+          checked: { scale: 1, opacity: 1 },
+          unchecked: { scale: 0.5, opacity: 0 },
+        }}
+        transition={{ type: "spring", stiffness: 500, damping: 30 }}
+        className="flex items-center justify-center text-primary-foreground"
+      >
+        <svg
+          className="size-3.5 stroke-[3px]"
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+        >
+          <motion.path
+            initial={{ pathLength: 0 }}
+            animate={{ pathLength: checked ? 1 : 0 }}
+            transition={{ type: "spring", stiffness: 400, damping: 28, delay: 0.05 }}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            d="M5 13l4 4L19 7"
+          />
+        </svg>
+      </motion.div>
+    </button>
+  );
+}
+
 export function TaskDetailsVault({
   task,
   open,
@@ -70,11 +112,18 @@ export function TaskDetailsVault({
   const [shouldNotify, setShouldNotify] = useState(task.taskShouldNotify || false);
   const [newSubtaskTitle, setNewSubtaskTitle] = useState("");
   const [isConverting, setIsConverting] = useState(false);
+  const [title, setTitle] = useState(task.title);
+  const [prevTaskTitle, setPrevTaskTitle] = useState(task.title);
+
+  if (task.title !== prevTaskTitle) {
+    setTitle(task.title);
+    setPrevTaskTitle(task.title);
+  }
 
   const completedCount = subtasks.filter((s) => s.completed).length;
   const progress = subtasks.length > 0 ? (completedCount / subtasks.length) * 100 : 0;
 
-  const saveField = useCallback(async (updates: Partial<Note>) => {
+  const saveField = useCallback(async (updates: Partial<Note>, rollbackFn?: () => void) => {
     try {
       const result = await updateNoteAction({
         id: task.id,
@@ -82,10 +131,12 @@ export function TaskDetailsVault({
       });
       if (!result?.data?.success) {
         toast.error("Erro ao salvar alteração em segundo plano.");
+        rollbackFn?.();
       }
     } catch (err) {
       console.error(err);
       toast.error("Erro de conexão ao salvar alteração.");
+      rollbackFn?.();
     }
   }, [task.id]);
 
@@ -96,29 +147,32 @@ export function TaskDetailsVault({
       title: newSubtaskTitle.trim(),
       completed: false,
     };
-    setSubtasks((prev) => {
-      const next = [...prev, newSub];
-      saveField({ taskSubtasks: next });
-      return next;
-    });
+    const prevSubtasks = [...subtasks];
+    const next = [...subtasks, newSub];
+    setSubtasks(next);
     setNewSubtaskTitle("");
-  }, [newSubtaskTitle, saveField]);
+    saveField({ taskSubtasks: next }, () => {
+      setSubtasks(prevSubtasks);
+    });
+  }, [newSubtaskTitle, subtasks, saveField]);
 
   const handleToggleSubtask = useCallback((id: string) => {
-    setSubtasks((prev) => {
-      const next = prev.map((s) => (s.id === id ? { ...s, completed: !s.completed } : s));
-      saveField({ taskSubtasks: next });
-      return next;
+    const prevSubtasks = [...subtasks];
+    const next = subtasks.map((s) => (s.id === id ? { ...s, completed: !s.completed } : s));
+    setSubtasks(next);
+    saveField({ taskSubtasks: next }, () => {
+      setSubtasks(prevSubtasks);
     });
-  }, [saveField]);
+  }, [subtasks, saveField]);
 
   const handleDeleteSubtask = useCallback((id: string) => {
-    setSubtasks((prev) => {
-      const next = prev.filter((s) => s.id !== id);
-      saveField({ taskSubtasks: next });
-      return next;
+    const prevSubtasks = [...subtasks];
+    const next = subtasks.filter((s) => s.id !== id);
+    setSubtasks(next);
+    saveField({ taskSubtasks: next }, () => {
+      setSubtasks(prevSubtasks);
     });
-  }, [saveField]);
+  }, [subtasks, saveField]);
 
   const handleStatusChange = (newStatus: TaskStatus) => {
     setStatus(newStatus);
@@ -168,8 +222,29 @@ export function TaskDetailsVault({
   return (
     <Vault open={open} onOpenChange={onOpenChange}>
       <VaultContent aria-label="Detalhes da tarefa" className="sm:max-w-xl">
-        <VaultHeader showCloseButton={false}>
-          <VaultTitle className="text-left text-lg">{task.title}</VaultTitle>
+        <VaultHeader showCloseButton={false} className="w-full">
+          <Input
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            onBlur={() => {
+              const trimmed = title.trim();
+              if (!trimmed) {
+                setTitle(task.title);
+                toast.error("O título da tarefa não pode ser vazio.");
+                return;
+              }
+              if (trimmed !== task.title) {
+                saveField({ title: trimmed });
+              }
+            }}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.currentTarget.blur();
+              }
+            }}
+            placeholder="Título da tarefa"
+            className="w-full text-lg font-bold bg-transparent border-transparent hover:border-border/50 focus-visible:border-primary/50 focus-visible:ring-1 focus-visible:ring-primary/50 h-10 px-2 -ml-2 text-left"
+          />
         </VaultHeader>
 
         <VaultBody className="space-y-5">
@@ -206,12 +281,12 @@ export function TaskDetailsVault({
               Data Limite
             </label>
             <div className="relative">
-              <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
-              <input
+              <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground z-10 pointer-events-none" />
+              <Input
                 type="datetime-local"
                 value={deadline ? deadline.slice(0, 16) : ""}
                 onChange={(e) => handleDeadlineChange(e.target.value)}
-                className="w-full h-10 pl-10 pr-3 rounded-lg border border-border/50 bg-muted/30 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-primary/50 transition-all"
+                className="pl-10 bg-muted/10"
               />
             </div>
           </div>
@@ -240,52 +315,53 @@ export function TaskDetailsVault({
             )}
 
             {/* Subtask list */}
-            <div className="flex flex-col gap-1 max-h-40 overflow-y-auto">
-              {subtasks.map((sub) => (
-                <div
-                  key={sub.id}
-                  className="flex items-center gap-2 group py-1 px-1 rounded-md hover:bg-muted/30 transition-colors"
-                >
-                  <button
-                    onClick={() => handleToggleSubtask(sub.id)}
-                    className={cn(
-                      "shrink-0 size-4 rounded border transition-all cursor-pointer",
-                      sub.completed
-                        ? "bg-primary border-primary"
-                        : "border-border/80 hover:border-primary/50"
-                    )}
+            <div className="flex flex-col gap-1.5 max-h-40 overflow-y-auto overflow-x-hidden pr-1">
+              <AnimatePresence initial={false} mode="popLayout">
+                {subtasks.map((sub) => (
+                  <motion.div
+                    key={sub.id}
+                    layout
+                    initial={{ opacity: 0, height: 0, y: -8 }}
+                    animate={{ opacity: 1, height: "auto", y: 0 }}
+                    exit={{ opacity: 0, height: 0, y: 8 }}
+                    transition={{ type: "spring", stiffness: 500, damping: 30 }}
+                    className="flex items-center gap-2 group py-1.5 px-2 rounded-lg hover:bg-muted/30 transition-colors border border-transparent hover:border-border/20"
                   >
-                    {sub.completed && (
-                      <CheckCircle2 className="size-4 text-primary-foreground" />
-                    )}
-                  </button>
-                  <span
-                    className={cn(
-                      "text-sm flex-1 transition-all",
-                      sub.completed && "line-through text-muted-foreground"
-                    )}
-                  >
-                    {sub.title}
-                  </span>
-                  <button
-                    onClick={() => handleDeleteSubtask(sub.id)}
-                    className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-destructive transition-all cursor-pointer"
-                  >
-                    <Trash2 className="size-3.5" />
-                  </button>
-                </div>
-              ))}
+                    <AnimatedCheckbox
+                      checked={sub.completed}
+                      onChange={() => handleToggleSubtask(sub.id)}
+                    />
+                    <div className="relative flex-1 text-sm select-none">
+                      <span className={cn("transition-colors duration-300 font-medium", sub.completed ? "text-muted-foreground" : "text-foreground")}>
+                        {sub.title}
+                      </span>
+                      <motion.div
+                        initial={false}
+                        animate={{ width: sub.completed ? "100%" : "0%" }}
+                        transition={{ type: "spring", stiffness: 350, damping: 25 }}
+                        className="absolute left-0 top-1/2 -translate-y-1/2 h-[1px] bg-muted-foreground/60 origin-left"
+                      />
+                    </div>
+                    <button
+                      onClick={() => handleDeleteSubtask(sub.id)}
+                      className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-destructive transition-all cursor-pointer p-1 rounded hover:bg-muted"
+                    >
+                      <Trash2 className="size-3.5" />
+                    </button>
+                  </motion.div>
+                ))}
+              </AnimatePresence>
             </div>
 
             {/* Add subtask input */}
             <div className="flex items-center gap-2">
-              <input
+              <Input
                 type="text"
                 value={newSubtaskTitle}
                 onChange={(e) => setNewSubtaskTitle(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && handleAddSubtask()}
                 placeholder="Nova subtask..."
-                className="flex-1 h-9 px-3 rounded-lg border border-border/50 bg-muted/20 text-sm text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:ring-1 focus:ring-primary/50 transition-all"
+                className="flex-1 h-9 text-sm"
               />
               <button
                 onClick={handleAddSubtask}
@@ -323,23 +399,22 @@ export function TaskDetailsVault({
             </button>
           </div>
 
-          {/* Link to Kanban */}
+          <div className="flex min-w-full items-center gap-2">
           <Link
             href={`/hub/tasks?taskId=${task.id}`}
             onClick={() => onOpenChange(false)}
-            className="flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl border border-border/50 bg-muted/20 text-sm font-medium text-foreground hover:bg-muted/40 transition-all"
           >
+            <Button className="min-w-full!" variant="outline">
             Ver no Kanban
             <ArrowRight className="ml-2 size-4" />
+            </Button>
           </Link>
-        </VaultBody>
-
-        <VaultFooter>
-          <VaultPrimaryButton
+          <Button
+            variant="destructive"
             onClick={handleConvertToNote}
             disabled={isConverting}
-          >
-            {isConverting ? (
+            >
+             {isConverting ? (
               <>
                 <Loader2 className="size-4 animate-spin" />
                 Convertendo...
@@ -350,8 +425,9 @@ export function TaskDetailsVault({
                 Voltar para Nota
               </>
             )}
-          </VaultPrimaryButton>
-        </VaultFooter>
+          </Button>
+          </div>
+        </VaultBody>
       </VaultContent>
     </Vault>
   );

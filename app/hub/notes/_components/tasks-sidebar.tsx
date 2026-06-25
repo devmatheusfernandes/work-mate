@@ -13,7 +13,6 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { motion, AnimatePresence } from "framer-motion";
-import { toast } from "sonner";
 import { updateNoteAction } from "@/modules/notes/notes.actions";
 import { TaskDetailsVault } from "./task-details-vault";
 import type { Note, TaskStatus } from "@/modules/notes/notes.schema";
@@ -23,6 +22,11 @@ interface TasksSidebarProps {
   isOpen: boolean;
   onToggle: () => void;
   onDragOverSidebar: () => void;
+  onUpdateNoteOptimistic: (
+    id: string,
+    updates: Partial<Note>,
+    apiCall: () => Promise<{ data?: { success?: boolean } } | undefined>
+  ) => void;
 }
 
 const LANES: {
@@ -181,6 +185,7 @@ export function TasksSidebar({
   isOpen,
   onToggle,
   onDragOverSidebar,
+  onUpdateNoteOptimistic,
 }: TasksSidebarProps) {
   const [expandedLane, setExpandedLane] = useState<TaskStatus | null>(null);
   const [dragOverLane, setDragOverLane] = useState<TaskStatus | null>(null);
@@ -207,47 +212,105 @@ export function TasksSidebar({
     if (!id) return;
 
     if (type === "note") {
-      // Convert note to task
-      const toastId = toast.loading("Convertendo nota em tarefa...");
-      try {
-        const result = await updateNoteAction({
-          id,
-          updates: {
-            type: "task",
-            taskStatus: targetStatus,
-            taskSubtasks: [],
-            taskDeadline: null,
-            taskShouldNotify: false,
-          },
-        });
-        if (result?.data?.success) {
-          toast.success("Nota convertida em tarefa!", { id: toastId });
-        } else {
-          toast.error("Erro ao converter.", { id: toastId });
-        }
-      } catch {
-        toast.error("Erro ao converter.", { id: toastId });
-      }
+      onUpdateNoteOptimistic(
+        id,
+        {
+          type: "task",
+          taskStatus: targetStatus,
+          taskSubtasks: [],
+          taskDeadline: null,
+          taskShouldNotify: false,
+        },
+        () =>
+          updateNoteAction({
+            id,
+            updates: {
+              type: "task",
+              taskStatus: targetStatus,
+              taskSubtasks: [],
+              taskDeadline: null,
+              taskShouldNotify: false,
+            },
+          })
+      );
     } else if (type === "task") {
-      // Move task to another lane
       const existingTask = tasks.find((t) => t.id === id);
       if (existingTask && existingTask.taskStatus === targetStatus) return;
 
-      const toastId = toast.loading("Movendo tarefa...");
-      try {
-        const result = await updateNoteAction({
-          id,
-          updates: { taskStatus: targetStatus },
-        });
-        if (result?.data?.success) {
-          toast.success("Tarefa movida!", { id: toastId });
-        } else {
-          toast.error("Erro ao mover tarefa.", { id: toastId });
-        }
-      } catch {
-        toast.error("Erro ao mover tarefa.", { id: toastId });
-      }
+      onUpdateNoteOptimistic(
+        id,
+        { taskStatus: targetStatus },
+        () =>
+          updateNoteAction({
+            id,
+            updates: { taskStatus: targetStatus },
+          })
+      );
     }
+  };
+
+  const renderLaneTasks = (laneTasks: Note[], laneStatus: TaskStatus, isExpanded: boolean) => {
+    const elements: React.ReactNode[] = [];
+
+    laneTasks.forEach((task) => {
+      elements.push(
+        isExpanded ? (
+          <motion.div
+            key={task.id}
+            layout
+            transition={{ type: "spring", stiffness: 200, damping: 24 }}
+          >
+            <ExpandedTaskCard
+              task={task}
+              onClick={() => setSelectedTask(task)}
+            />
+          </motion.div>
+        ) : (
+          <motion.div
+            key={task.id}
+            layout
+            transition={{ type: "spring", stiffness: 200, damping: 24 }}
+          >
+            <MiniTaskCard
+              task={task}
+              onClick={() => setSelectedTask(task)}
+            />
+          </motion.div>
+        )
+      );
+    });
+
+    if (dragOverLane === laneStatus) {
+      elements.push(
+        isExpanded ? (
+          <motion.div
+            key="lane-placeholder"
+            layout
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.95 }}
+            transition={{ type: "spring", stiffness: 200, damping: 24 }}
+            className="w-full h-[76px] rounded-lg border-2 border-dashed border-primary/30 bg-primary/5 flex items-center justify-center text-primary/40 text-xs font-semibold"
+          >
+            Solte para mover
+          </motion.div>
+        ) : (
+          <motion.div
+            key="lane-placeholder"
+            layout
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.95 }}
+            transition={{ type: "spring", stiffness: 200, damping: 24 }}
+            className="shrink-0 w-48 h-[76px] rounded-lg border-2 border-dashed border-primary/30 bg-primary/5 flex items-center justify-center text-primary/40 text-[10px] font-semibold"
+          >
+            Solte aqui
+          </motion.div>
+        )
+      );
+    }
+
+    return elements;
   };
 
   const isExpanded = expandedLane !== null;
@@ -357,35 +420,23 @@ export function TasksSidebar({
                     {isThisExpanded ? (
                       // Expanded: vertical list
                       <div className="flex flex-col gap-2 overflow-y-auto">
-                        {laneTasks.length === 0 ? (
+                        {laneTasks.length === 0 && dragOverLane !== lane.status ? (
                           <p className="text-xs text-muted-foreground/50 text-center py-4">
                             Nenhuma tarefa
                           </p>
                         ) : (
-                          laneTasks.map((task) => (
-                            <ExpandedTaskCard
-                              key={task.id}
-                              task={task}
-                              onClick={() => setSelectedTask(task)}
-                            />
-                          ))
+                          renderLaneTasks(laneTasks, lane.status, true)
                         )}
                       </div>
                     ) : (
                       // Collapsed: horizontal scroll
                       <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1">
-                        {laneTasks.length === 0 ? (
+                        {laneTasks.length === 0 && dragOverLane !== lane.status ? (
                           <p className="text-xs text-muted-foreground/50 text-center w-full py-4">
                             Arraste uma nota aqui
                           </p>
                         ) : (
-                          laneTasks.map((task) => (
-                            <MiniTaskCard
-                              key={task.id}
-                              task={task}
-                              onClick={() => setSelectedTask(task)}
-                            />
-                          ))
+                          renderLaneTasks(laneTasks, lane.status, false)
                         )}
                       </div>
                     )}
