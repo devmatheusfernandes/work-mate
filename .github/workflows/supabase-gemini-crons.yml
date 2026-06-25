@@ -28,8 +28,18 @@ jobs:
           APP_URL: ${{ secrets.APP_URL }}
           CRON_SECRET: ${{ secrets.CRON_SECRET }}
         run: |
-          echo "Disparando processador de fila..."
-          curl -fail -X POST "$APP_URL/api/cron/process-queue" \
+          if [ -z "$APP_URL" ]; then
+            echo "::error::A variável APP_URL está vazia. Certifique-se de configurar o secret APP_URL nas configurações do seu repositório no GitHub (Settings > Secrets and variables > Actions)."
+            exit 1
+          fi
+          
+          URL="$APP_URL"
+          if [[ ! "$URL" =~ ^https?:// ]]; then
+            URL="https://$URL"
+          fi
+          
+          echo "Disparando processador de fila em $URL..."
+          curl -fail -X POST "$URL/api/cron/process-queue" \
             -H "Authorization: Bearer $CRON_SECRET" \
             -H "Content-Length: 0"
           echo "Processamento concluído com sucesso."
@@ -42,7 +52,18 @@ jobs:
           APP_URL: ${{ secrets.APP_URL }}
           CRON_SECRET: ${{ secrets.CRON_SECRET }}
         run: |
-          echo "Disparando limpeza de storage..."
-          curl -fail -X GET "$APP_URL/api/cron/cleanup-storage" \
+          if [ -z "$APP_URL" ]; then
+            echo "::error::A variável APP_URL está vazia. Certifique-se de configurar o secret APP_URL nas configurações do seu repositório no GitHub (Settings > Secrets and variables > Actions)."
+            exit 1
+          fi
+          
+          URL="$APP_URL"
+          if [[ ! "$URL" =~ ^https?:// ]]; then
+            URL="https://$URL"
+          fi
+          
+          echo "Disparando limpeza de storage em $URL..."
+          curl -fail -X GET "$URL/api/cron/cleanup-storage" \
             -H "Authorization: Bearer $CRON_SECRET"
           echo "Limpeza de storage concluída com sucesso."
+
