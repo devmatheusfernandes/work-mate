@@ -24,10 +24,13 @@ jobs:
         if: |
           github.event_name == 'schedule' && github.event.schedule == '*/10 * * * *' ||
           github.event_name == 'workflow_dispatch' && (github.event.inputs.job == 'queue' || github.event.inputs.job == 'ambos')
+        env:
+          APP_URL: ${{ secrets.APP_URL }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
         run: |
           echo "Disparando processador de fila..."
-          curl -fail -X POST "${{ secrets.APP_URL }}/api/cron/process-queue" \
-            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+          curl -fail -X POST "$APP_URL/api/cron/process-queue" \
+            -H "Authorization: Bearer $CRON_SECRET" \
             -H "Content-Length: 0"
           echo "Processamento concluído com sucesso."
 
@@ -35,8 +38,11 @@ jobs:
         if: |
           github.event_name == 'schedule' && github.event.schedule == '0 0 * * *' ||
           github.event_name == 'workflow_dispatch' && (github.event.inputs.job == 'cleanup' || github.event.inputs.job == 'ambos')
+        env:
+          APP_URL: ${{ secrets.APP_URL }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
         run: |
           echo "Disparando limpeza de storage..."
-          curl -fail -X GET "${{ secrets.APP_URL }}/api/cron/cleanup-storage" \
-            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}"
+          curl -fail -X GET "$APP_URL/api/cron/cleanup-storage" \
+            -H "Authorization: Bearer $CRON_SECRET"
           echo "Limpeza de storage concluída com sucesso."
