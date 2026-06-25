@@ -25,6 +25,7 @@ import { Button } from "@/components/ui/button";
 import { useCalendarStore } from "@/modules/calendar/calendar.store";
 import { getNotesAction } from "@/modules/notes/notes.actions";
 import { Note } from "@/modules/notes/notes.schema";
+import { SidebarTrigger } from "@/components/layout/sidebar-trigger";
 
 interface ChatInterfaceProps {
   isSidebar?: boolean;
@@ -561,6 +562,7 @@ export function ChatInterface({
           isSidebar ? "bg-card/80 pl-11" : "bg-background/80"
         )}>
           <div className="flex items-center gap-2">
+            <SidebarTrigger />
             {!isSidebar && (
               <Button
                 variant="ghost"

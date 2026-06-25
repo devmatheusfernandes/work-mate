@@ -5,13 +5,14 @@ import { SimpleEditor } from "@/components/tiptap-templates/simple/simple-editor
 import { updateNoteAction } from "@/modules/notes/notes.actions";
 import { Note } from "@/modules/notes/notes.schema";
 import { Loader2, CheckCircle2, AlertCircle } from "lucide-react";
+import { saveOfflineItem } from "@/lib/offline-db";
 
 interface NoteEditorClientProps {
   note: Note;
 }
 
 export function NoteEditorClient({ note }: NoteEditorClientProps) {
-  const [saveStatus, setSaveStatus] = useState<"saved" | "saving" | "error">("saved");
+  const [saveStatus, setSaveStatus] = useState<"saved" | "saving" | "error" | "saved_offline">("saved");
   const [noteTitle, setNoteTitle] = useState(note.title);
   const [noteContent, setNoteContent] = useState(note.content || "");
   const [prevNote, setPrevNote] = useState(note);
@@ -41,10 +42,26 @@ export function NoteEditorClient({ note }: NoteEditorClientProps) {
     }
 
     saveTimeoutRef.current = setTimeout(async () => {
+      const isOffline = typeof window !== "undefined" && !window.navigator.onLine;
+      const updatedNote = { ...note, ...updates } as Note;
+
+      if (isOffline) {
+        await saveOfflineItem("notes", updatedNote);
+        await saveOfflineItem("syncQueue", {
+          id: `op_${note.id}_${Date.now()}`,
+          actionName: "updateNote",
+          payload: { id: note.id, updates },
+          timestamp: Date.now(),
+        });
+        setSaveStatus("saved_offline");
+        return;
+      }
+
       try {
         const res = await updateNoteAction({ id: note.id, updates });
         if (res?.data?.success) {
           setSaveStatus("saved");
+          await saveOfflineItem("notes", updatedNote);
         } else {
           setSaveStatus("error");
         }
@@ -86,6 +103,12 @@ export function NoteEditorClient({ note }: NoteEditorClientProps) {
           <>
             <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" />
             <span className="text-muted-foreground">Nota sincronizada</span>
+          </>
+        )}
+        {saveStatus === "saved_offline" && (
+          <>
+            <CheckCircle2 className="h-3.5 w-3.5 text-amber-500" />
+            <span className="text-amber-500">Salvo localmente (offline)</span>
           </>
         )}
         {saveStatus === "error" && (

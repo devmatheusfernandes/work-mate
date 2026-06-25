@@ -30,6 +30,7 @@ export interface HeaderProps extends React.HTMLAttributes<HTMLDivElement> {
     title: string;
     subtitle?: string;
     backHref?: string;
+    showSidebarTrigger?: boolean;
     onSearchChange?: (value: string) => void;
     actions?: HeaderAction[];
     showSubHeader?: boolean;
@@ -46,6 +47,7 @@ const Header = React.forwardRef<HTMLDivElement, HeaderProps>(({
     title,
     subtitle,
     backHref,
+    showSidebarTrigger,
     onSearchChange,
     actions = [],
     showSubHeader = true,
@@ -165,7 +167,9 @@ const Header = React.forwardRef<HTMLDivElement, HeaderProps>(({
                                 className="flex w-full items-center justify-between h-full"
                             >
                                 <div className="flex items-center w-1/4 sm:w-1/3">
-                                    {backHref ? (
+                                    {showSidebarTrigger ? (
+                                        <SidebarTrigger className="-ml-2" />
+                                    ) : backHref ? (
                                         <Link
                                             href={backHref}
                                             className={buttonVariants({

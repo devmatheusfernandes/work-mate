@@ -8,6 +8,13 @@ import {
   archiveChatSessionAction, 
   deleteChatSessionAction 
 } from "./chat.actions";
+import {
+  saveOfflineItem,
+  deleteOfflineItem,
+  getAllOfflineItems,
+  saveOfflineItemsBatch,
+} from "@/lib/offline-db";
+import { toast } from "sonner";
 
 interface ChatState {
   sessions: ChatSession[];
@@ -51,6 +58,17 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
   loadSessions: async (type = "active") => {
     set({ isLoadingSessions: true });
+    const isOffline = typeof window !== "undefined" && !window.navigator.onLine;
+
+    if (isOffline) {
+      const dbSessions = await getAllOfflineItems<ChatSession>("chatSessions");
+      if (dbSessions.length > 0) {
+        set({ sessions: dbSessions });
+      }
+      set({ isLoadingSessions: false });
+      return;
+    }
+
     try {
       const res = await getChatSessionsAction({ type });
       if (res?.data?.success && res.data.sessions) {
@@ -61,6 +79,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
           createdAt: new Date(s.createdAt),
           updatedAt: new Date(s.updatedAt),
         }));
+        await saveOfflineItemsBatch("chatSessions", sessions);
         set({ sessions });
       }
     } catch (error) {
@@ -72,6 +91,21 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
   loadMessages: async (sessionId) => {
     set({ isLoadingMessages: true });
+    const isOffline = typeof window !== "undefined" && !window.navigator.onLine;
+
+    if (isOffline) {
+      type OfflineChatMessage = Omit<ChatMessage, "createdAt"> & { createdAt: string | Date; sessionId?: string | null };
+      const dbMessages = await getAllOfflineItems<OfflineChatMessage>("chatMessages");
+      const filtered = dbMessages.filter((m) => m.sessionId === sessionId);
+      const messages = filtered.map((m) => ({
+        ...m,
+        createdAt: new Date(m.createdAt),
+      } as ChatMessage));
+      set({ messages });
+      set({ isLoadingMessages: false });
+      return;
+    }
+
     try {
       const res = await getChatMessagesAction({ sessionId });
       if (res?.data?.success && res.data.messages) {
@@ -80,6 +114,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
           ...m,
           createdAt: new Date(m.createdAt),
         }));
+        await saveOfflineItemsBatch("chatMessages", messages);
         set({ messages });
       }
     } catch (error) {
@@ -90,6 +125,42 @@ export const useChatStore = create<ChatState>((set, get) => ({
   },
 
   createNewSession: async () => {
+    const isOffline = typeof window !== "undefined" && !window.navigator.onLine;
+
+    if (isOffline) {
+      const tempId = `temp_session_${Date.now()}`;
+      const newSession: ChatSession = {
+        userId: "local",
+        id: tempId,
+        title: "Nova conversa",
+        isArchived: false,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+
+      try {
+        await saveOfflineItem("chatSessions", newSession);
+        set((state) => ({
+          sessions: [newSession, ...state.sessions],
+          currentSessionId: tempId,
+          messages: [],
+        }));
+        await saveOfflineItem("syncQueue", {
+          id: `op_${tempId}`,
+          actionName: "createFolder", // reuse createFolder or make a sync operation for createSession if supported
+          payload: {
+            id: tempId,
+            title: "Nova conversa",
+          },
+          timestamp: Date.now(),
+        });
+        return tempId;
+      } catch (err) {
+        console.error(err);
+      }
+      return null;
+    }
+
     try {
       const res = await createChatSessionAction({ title: "Nova conversa" });
       if (res?.data?.success && res.data.session) {
@@ -107,9 +178,32 @@ export const useChatStore = create<ChatState>((set, get) => ({
   sendMessage: async (content: string) => {
     if (!content.trim() || get().isGenerating) return;
 
+    const isOffline = typeof window !== "undefined" && !window.navigator.onLine;
+    let actualSessionId = get().currentSessionId;
+
+    const tempMsgId = "optimistic_" + Math.random().toString(36).substring(7);
+    const tempBotMsgId = "msg_placeholder_" + Math.random().toString(36).substring(7);
+
+    if (isOffline && !actualSessionId) {
+      actualSessionId = `temp_session_${Date.now()}`;
+      const newSession: ChatSession = {
+        userId: "local",
+        id: actualSessionId,
+        title: content.substring(0, 30),
+        isArchived: false,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+      await saveOfflineItem("chatSessions", newSession);
+      set((state) => ({
+        sessions: [newSession, ...state.sessions],
+        currentSessionId: actualSessionId,
+      }));
+    }
+
     // Build optimistic user message
     const userMessage: ChatMessage = {
-      id: "optimistic_" + Math.random().toString(36).substring(7),
+      id: tempMsgId,
       role: "user",
       content,
       createdAt: new Date(),
@@ -118,6 +212,44 @@ export const useChatStore = create<ChatState>((set, get) => ({
       cost: null,
       precision: null,
     };
+
+    if (isOffline) {
+      const assistantMessage: ChatMessage = {
+        id: tempBotMsgId,
+        role: "assistant",
+        content: "Você está offline. Sua pergunta foi salva na fila e será respondida assim que você recuperar a conexão.",
+        createdAt: new Date(),
+        promptTokens: null,
+        candidatesTokens: null,
+        cost: null,
+        precision: null,
+      };
+
+      set((state) => ({
+        messages: [...state.messages, userMessage, assistantMessage],
+        isGenerating: false,
+      }));
+
+      try {
+        await saveOfflineItem("chatMessages", { ...userMessage, sessionId: actualSessionId });
+        await saveOfflineItem("chatMessages", { ...assistantMessage, sessionId: actualSessionId });
+        await saveOfflineItem("syncQueue", {
+          id: `op_${tempMsgId}`,
+          actionName: "sendChatMessage",
+          payload: {
+            sessionId: actualSessionId,
+            content,
+            tempMsgId,
+            tempBotMsgId,
+          },
+          timestamp: Date.now(),
+        });
+        toast.info("Pergunta salva na fila offline.");
+      } catch (err) {
+        console.error(err);
+      }
+      return;
+    }
 
     set((state) => ({
       messages: [...state.messages, userMessage],
@@ -128,7 +260,6 @@ export const useChatStore = create<ChatState>((set, get) => ({
     let responseText = "";
     type RawServerMessage = Omit<ChatMessage, "createdAt" | "role"> & { createdAt: string | Date; role: string };
     let serverMessage: RawServerMessage | null = null;
-    let actualSessionId = get().currentSessionId;
 
     try {
       const res = await sendChatMessageAction({ 
@@ -192,11 +323,38 @@ export const useChatStore = create<ChatState>((set, get) => ({
           set({ isGenerating: false });
           resolve();
         }
-      }, 25); // Faster streaming for responsive feeling
+      }, 25);
     });
   },
 
   archiveSession: async (sessionId, isArchived) => {
+    const isOffline = typeof window !== "undefined" && !window.navigator.onLine;
+
+    if (isOffline) {
+      try {
+        const session = get().sessions.find((s) => s.id === sessionId);
+        if (session) {
+          const updated = { ...session, isArchived };
+          await saveOfflineItem("chatSessions", updated);
+          set((state) => ({
+            sessions: state.sessions.map((s) => (s.id === sessionId ? updated : s)),
+            currentSessionId: state.currentSessionId === sessionId ? null : state.currentSessionId,
+            messages: state.currentSessionId === sessionId ? [] : state.messages,
+          }));
+          await saveOfflineItem("syncQueue", {
+            id: `op_arch_sess_${sessionId}_${Date.now()}`,
+            actionName: "archiveSession", // we can ignore or add sync operation for archiving session
+            payload: { sessionId, isArchived },
+            timestamp: Date.now(),
+          });
+          toast.success(isArchived ? "Conversa arquivada offline!" : "Conversa desarquivada offline!");
+        }
+      } catch (err) {
+        console.error(err);
+      }
+      return;
+    }
+
     try {
       const res = await archiveChatSessionAction({ sessionId, isArchived });
       if (res?.data?.success) {
@@ -211,6 +369,29 @@ export const useChatStore = create<ChatState>((set, get) => ({
   },
 
   deleteSession: async (sessionId) => {
+    const isOffline = typeof window !== "undefined" && !window.navigator.onLine;
+
+    if (isOffline) {
+      try {
+        await deleteOfflineItem("chatSessions", sessionId);
+        set((state) => ({
+          sessions: state.sessions.filter((s) => s.id !== sessionId),
+          currentSessionId: state.currentSessionId === sessionId ? null : state.currentSessionId,
+          messages: state.currentSessionId === sessionId ? [] : state.messages,
+        }));
+        await saveOfflineItem("syncQueue", {
+          id: `op_del_sess_${sessionId}_${Date.now()}`,
+          actionName: "deleteSession",
+          payload: { sessionId },
+          timestamp: Date.now(),
+        });
+        toast.success("Conversa excluída offline!");
+      } catch (err) {
+        console.error(err);
+      }
+      return;
+    }
+
     try {
       const res = await deleteChatSessionAction({ sessionId });
       if (res?.data?.success) {

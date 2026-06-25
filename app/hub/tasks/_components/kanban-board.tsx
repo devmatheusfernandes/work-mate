@@ -263,7 +263,7 @@ export function KanbanBoard({ tasks }: { tasks: Note[] }) {
     <div className="flex flex-col h-full">
       <Header
         title="Tarefas"
-        backHref="/hub/notes"
+        showSidebarTrigger
         showSubHeader={false}
         className="contents"
       />

@@ -28,7 +28,8 @@ import {
   VaultField,
   VaultInput,
 } from "@/components/ui/vault";
-import { Tag } from "@/modules/notes/notes.schema";
+import { Note, Folder, Tag } from "@/modules/notes/notes.schema";
+import { saveOfflineItem, deleteOfflineItem } from "@/lib/offline-db";
 
 interface CreateButtonProps {
   activeFolderId: string | null;
@@ -36,6 +37,10 @@ interface CreateButtonProps {
   isTasksSidebarOpen?: boolean;
   isTasksSidebarExpanded?: boolean;
   onOpenTasksSidebar?: () => void;
+  onNoteCreatedOffline?: (note: Note) => void;
+  onFolderCreatedOffline?: (folder: Folder) => void;
+  onTagCreatedOffline?: (tag: Tag) => void;
+  onTagDeletedOffline?: (tagId: string) => void;
 }
 
 const tagColors = [
@@ -152,7 +157,11 @@ export function CreateButton({
   tags, 
   isTasksSidebarOpen = false, 
   isTasksSidebarExpanded = false,
-  onOpenTasksSidebar
+  onOpenTasksSidebar,
+  onNoteCreatedOffline,
+  onFolderCreatedOffline,
+  onTagCreatedOffline,
+  onTagDeletedOffline,
 }: CreateButtonProps) {
   const isChatOpen = useChatStore((state) => state.isSidebarOpen);
   const isCalendarOpen = useCalendarStore((state) => state.isSidebarOpen);
@@ -207,8 +216,66 @@ export function CreateButton({
   const handleCreateNote = useCallback(async () => {
     setIsCreatingNote(true);
     setIsOpenMenu(false);
-    const toastId = toast.loading("Criando nota...");
 
+    const isOffline = typeof window !== "undefined" && !window.navigator.onLine;
+
+    const createOffline = async () => {
+      const tempId = `temp_note_${Date.now()}`;
+      const newNote: Note = {
+        userId: "local",
+        id: tempId,
+        title: "Nova Nota",
+        folderId: activeFolderId,
+        type: "note",
+        content: "",
+        searchText: "",
+        tagIds: [] as string[],
+        archived: false,
+        trashed: false,
+        pinned: false,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        isLocked: false,
+        taskStatus: null,
+        taskDeadline: null,
+        taskSubtasks: [],
+        taskShouldNotify: false,
+      };
+
+      await saveOfflineItem("notes", newNote);
+      await saveOfflineItem("syncQueue", {
+        id: `op_${tempId}`,
+        actionName: "createNote",
+        payload: {
+          id: tempId,
+          title: "Nova Nota",
+          folderId: activeFolderId,
+          type: "note",
+        },
+        timestamp: Date.now(),
+      });
+
+      toast.success("Nota criada offline!");
+      if (onNoteCreatedOffline) {
+        onNoteCreatedOffline(newNote);
+      } else {
+        window.location.reload();
+      }
+    };
+
+    if (isOffline) {
+      try {
+        await createOffline();
+      } catch (err) {
+        console.error(err);
+        toast.error("Erro ao criar nota offline.");
+      } finally {
+        setIsCreatingNote(false);
+      }
+      return;
+    }
+
+    const toastId = toast.loading("Criando nota...");
     try {
       const res = await createNoteAction({
         title: "Nova Nota",
@@ -224,17 +291,83 @@ export function CreateButton({
       }
     } catch (err) {
       console.error(err);
-      toast.error("Erro inesperado ao criar nota.", { id: toastId });
+      try {
+        toast.loading("Sem conexão. Salvando nota offline...", { id: toastId });
+        await createOffline();
+        toast.dismiss(toastId);
+      } catch (offlineErr) {
+        console.error(offlineErr);
+        toast.error("Erro inesperado ao criar nota.", { id: toastId });
+      }
     } finally {
       setIsCreatingNote(false);
     }
-  }, [activeFolderId, router]);
+  }, [activeFolderId, router, onNoteCreatedOffline]);
 
   const handleCreateTask = useCallback(async () => {
     setIsCreatingTask(true);
     setIsOpenMenu(false);
-    const toastId = toast.loading("Criando tarefa...");
 
+    const isOffline = typeof window !== "undefined" && !window.navigator.onLine;
+
+    const createOffline = async () => {
+      const tempId = `temp_task_${Date.now()}`;
+      const newNote: Note = {
+        userId: "local",
+        id: tempId,
+        title: "Nova Tarefa",
+        folderId: activeFolderId,
+        type: "task",
+        content: "",
+        searchText: "",
+        tagIds: [] as string[],
+        archived: false,
+        trashed: false,
+        pinned: false,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        isLocked: false,
+        taskStatus: "to_start",
+        taskDeadline: null,
+        taskSubtasks: [],
+        taskShouldNotify: false,
+      };
+
+      await saveOfflineItem("notes", newNote);
+      await saveOfflineItem("syncQueue", {
+        id: `op_${tempId}`,
+        actionName: "createNote",
+        payload: {
+          id: tempId,
+          title: "Nova Tarefa",
+          folderId: activeFolderId,
+          type: "task",
+          taskStatus: "to_start",
+        },
+        timestamp: Date.now(),
+      });
+
+      toast.success("Tarefa criada offline!");
+      if (onNoteCreatedOffline) {
+        onNoteCreatedOffline(newNote);
+      } else {
+        window.location.reload();
+      }
+    };
+
+    if (isOffline) {
+      try {
+        await createOffline();
+      } catch (err) {
+        console.error(err);
+        toast.error("Erro ao criar tarefa offline.");
+      } finally {
+        setIsCreatingTask(false);
+      }
+      return;
+    }
+
+    const toastId = toast.loading("Criando tarefa...");
     try {
       const res = await createNoteAction({
         title: "Nova Tarefa",
@@ -255,19 +388,73 @@ export function CreateButton({
       }
     } catch (err) {
       console.error(err);
-      toast.error("Erro inesperado ao criar tarefa.", { id: toastId });
+      try {
+        toast.loading("Sem conexão. Salvando tarefa offline...", { id: toastId });
+        await createOffline();
+        toast.dismiss(toastId);
+      } catch (offlineErr) {
+        console.error(offlineErr);
+        toast.error("Erro inesperado ao criar tarefa.", { id: toastId });
+      }
     } finally {
       setIsCreatingTask(false);
     }
-  }, [activeFolderId, router]);
+  }, [activeFolderId, router, onNoteCreatedOffline]);
 
-  const handleCreateFolder = async (e?: React.FormEvent) => {
+  const handleCreateFolder = useCallback(async (e?: React.FormEvent) => {
     e?.preventDefault();
     if (!folderTitle.trim()) return;
 
     setIsSubmittingFolder(true);
-    const toastId = toast.loading("Criando pasta...");
+    const isOffline = typeof window !== "undefined" && !window.navigator.onLine;
 
+    if (isOffline) {
+      const tempId = `temp_folder_${Date.now()}`;
+      const newFolder = {
+        userId: "local",
+        id: tempId,
+        title: folderTitle.trim(),
+        parentId: activeFolderId,
+        color: folderColor,
+        archived: false,
+        trashed: false,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        isLocked: false,
+      };
+
+      try {
+        await saveOfflineItem("folders", newFolder);
+        await saveOfflineItem("syncQueue", {
+          id: `op_${tempId}`,
+          actionName: "createFolder",
+          payload: {
+            id: tempId,
+            title: folderTitle.trim(),
+            parentId: activeFolderId,
+            color: folderColor,
+          },
+          timestamp: Date.now(),
+        });
+
+        toast.success("Pasta criada offline!");
+        setFolderTitle("");
+        setActiveVault(null);
+        if (onFolderCreatedOffline) {
+          onFolderCreatedOffline(newFolder);
+        } else {
+          window.location.reload();
+        }
+      } catch (err) {
+        console.error(err);
+        toast.error("Erro ao criar pasta offline.");
+      } finally {
+        setIsSubmittingFolder(false);
+      }
+      return;
+    }
+
+    const toastId = toast.loading("Criando pasta...");
     try {
       const res = await createFolderAction({
         title: folderTitle.trim(),
@@ -288,13 +475,55 @@ export function CreateButton({
     } finally {
       setIsSubmittingFolder(false);
     }
-  };
+  }, [folderTitle, folderColor, activeFolderId, onFolderCreatedOffline]);
 
-  const handleCreateTag = async (e?: React.FormEvent) => {
+  const handleCreateTag = useCallback(async (e?: React.FormEvent) => {
     e?.preventDefault();
     if (!newTagTitle.trim()) return;
 
     setIsSubmittingTag(true);
+    const isOffline = typeof window !== "undefined" && !window.navigator.onLine;
+
+    if (isOffline) {
+      const tempId = `temp_tag_${Date.now()}`;
+      const newTag = {
+        userId: "local",
+        id: tempId,
+        title: newTagTitle.trim(),
+        color: newTagColor,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+
+      try {
+        await saveOfflineItem("tags", newTag);
+        await saveOfflineItem("syncQueue", {
+          id: `op_${tempId}`,
+          actionName: "createTag",
+          payload: {
+            id: tempId,
+            title: newTagTitle.trim(),
+            color: newTagColor,
+          },
+          timestamp: Date.now(),
+        });
+
+        toast.success("Tag criada offline!");
+        setNewTagTitle("");
+        if (onTagCreatedOffline) {
+          onTagCreatedOffline(newTag);
+        } else {
+          window.location.reload();
+        }
+      } catch (err) {
+        console.error(err);
+        toast.error("Erro ao criar tag offline.");
+      } finally {
+        setIsSubmittingTag(false);
+      }
+      return;
+    }
+
     try {
       const res = await createTagAction({
         title: newTagTitle.trim(),
@@ -313,10 +542,36 @@ export function CreateButton({
     } finally {
       setIsSubmittingTag(false);
     }
-  };
+  }, [newTagTitle, newTagColor, onTagCreatedOffline]);
 
-  const handleDeleteTag = async (tagId: string) => {
+  const handleDeleteTag = useCallback(async (tagId: string) => {
     setDeletingTagId(tagId);
+    const isOffline = typeof window !== "undefined" && !window.navigator.onLine;
+
+    if (isOffline) {
+      try {
+        await deleteOfflineItem("tags", tagId);
+        await saveOfflineItem("syncQueue", {
+          id: `op_del_tag_${tagId}_${Date.now()}`,
+          actionName: "deleteTag",
+          payload: { id: tagId },
+          timestamp: Date.now(),
+        });
+        toast.success("Tag excluída offline.");
+        if (onTagDeletedOffline) {
+          onTagDeletedOffline(tagId);
+        } else {
+          window.location.reload();
+        }
+      } catch (err) {
+        console.error(err);
+        toast.error("Erro ao excluir tag offline.");
+      } finally {
+        setDeletingTagId(null);
+      }
+      return;
+    }
+
     try {
       const res = await deleteTagAction({ id: tagId });
       if (res?.data?.success) {
@@ -330,9 +585,9 @@ export function CreateButton({
     } finally {
       setDeletingTagId(null);
     }
-  };
+  }, [onTagDeletedOffline]);
 
-  const handleFileChange = async (e: ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = useCallback(async (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
@@ -349,6 +604,62 @@ export function CreateButton({
       const reader = new FileReader();
       reader.onload = async () => {
         const fileUrl = reader.result as string;
+        const isOffline = typeof window !== "undefined" && !window.navigator.onLine;
+
+        if (isOffline) {
+          const tempId = `temp_pdf_${Date.now()}`;
+          const newPdf: Note = {
+            userId: "local",
+            id: tempId,
+            title: file.name.replace(/\.[^/.]+$/, ""),
+            folderId: activeFolderId,
+            type: "pdf",
+            fileUrl,
+            archived: false,
+            trashed: false,
+            pinned: false,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+            isLocked: false,
+            tagIds: [] as string[],
+            content: "",
+            searchText: "",
+            taskStatus: null,
+            taskDeadline: null,
+            taskSubtasks: [],
+            taskShouldNotify: false,
+          };
+
+          try {
+            await saveOfflineItem("notes", newPdf);
+            await saveOfflineItem("syncQueue", {
+              id: `op_${tempId}`,
+              actionName: "createNote",
+              payload: {
+                id: tempId,
+                title: file.name.replace(/\.[^/.]+$/, ""),
+                folderId: activeFolderId,
+                type: "pdf",
+                fileUrl,
+              },
+              timestamp: Date.now(),
+            });
+
+            toast.success("PDF salvo localmente offline!", { id: toastId });
+            if (onNoteCreatedOffline) {
+              onNoteCreatedOffline(newPdf);
+            } else {
+              window.location.reload();
+            }
+          } catch (err) {
+            console.error(err);
+            toast.error("Erro ao salvar PDF offline.", { id: toastId });
+          } finally {
+            setIsUploadingPdf(false);
+          }
+          return;
+        }
+
         const res = await createNoteAction({
           title: file.name.replace(/\.[^/.]+$/, ""),
           folderId: activeFolderId,
@@ -374,7 +685,7 @@ export function CreateButton({
       toast.error("Erro inesperado ao enviar PDF.", { id: toastId });
       setIsUploadingPdf(false);
     }
-  };
+  }, [activeFolderId, router, onNoteCreatedOffline]);
 
   const handleMenuItemClick = (key: MenuKey) => {
     switch (key) {

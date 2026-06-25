@@ -23,6 +23,7 @@ interface NoteCardProps {
   onToggleSelect: () => void;
   isSelectionActive: boolean;
   mode?: "normal" | "archive" | "trash";
+  onOpenNote?: (note: Note) => void;
 }
 
 export function NoteCard({
@@ -31,6 +32,7 @@ export function NoteCard({
   onToggleSelect,
   isSelectionActive,
   mode = "normal",
+  onOpenNote,
 }: NoteCardProps) {
   const router = useRouter();
   const [taskVaultOpen, setTaskVaultOpen] = useState(false);
@@ -55,6 +57,14 @@ export function NoteCard({
       e.preventDefault();
       e.stopPropagation();
       onToggleSelect();
+      return;
+    }
+
+    // If offline or it's a temporary note, open in-app Vault editor
+    if (typeof window !== "undefined" && (!window.navigator.onLine || note.id.startsWith("temp_"))) {
+      e.preventDefault();
+      e.stopPropagation();
+      onOpenNote?.(note);
       return;
     }
 

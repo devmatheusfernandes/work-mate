@@ -9,6 +9,12 @@ import {
   syncCalendarAction,
 } from "./calendar.actions";
 import { toast } from "sonner";
+import {
+  saveOfflineItem,
+  deleteOfflineItem,
+  getAllOfflineItems,
+  saveOfflineItemsBatch,
+} from "@/lib/offline-db";
 
 interface CalendarState {
   isSidebarOpen: boolean;
@@ -64,10 +70,25 @@ export const useCalendarStore = create<CalendarState>((set, get) => ({
 
   fetchCalendars: async () => {
     set({ isLoading: true });
+    const isOffline = typeof window !== "undefined" && !window.navigator.onLine;
+
+    if (isOffline) {
+      const dbCalendars = await getAllOfflineItems<Calendar>("calendars");
+      if (dbCalendars.length > 0) {
+        const activeIds = get().activeCalendarIds.length === 0
+          ? dbCalendars.map((c) => c.id)
+          : get().activeCalendarIds.filter((id) => dbCalendars.some((c) => c.id === id));
+        set({ calendars: dbCalendars, activeCalendarIds: activeIds });
+      }
+      set({ isLoading: false });
+      return;
+    }
+
     try {
       const result = await getCalendarsAction({});
       if (result?.data?.success && result.data.calendars) {
         const calendars = result.data.calendars;
+        await saveOfflineItemsBatch("calendars", calendars);
         // Default all calendar IDs as active if filter is empty
         const activeIds = get().activeCalendarIds.length === 0
           ? calendars.map((c) => c.id)
@@ -82,10 +103,22 @@ export const useCalendarStore = create<CalendarState>((set, get) => ({
   },
 
   fetchEvents: async () => {
+    const isOffline = typeof window !== "undefined" && !window.navigator.onLine;
+
+    if (isOffline) {
+      const dbEvents = await getAllOfflineItems<CalendarEvent>("events");
+      if (dbEvents.length > 0) {
+        set({ events: dbEvents });
+      }
+      return;
+    }
+
     try {
       const result = await getEventsAction({});
       if (result?.data?.success && result.data.events) {
-        set({ events: result.data.events });
+        const events = result.data.events;
+        await saveOfflineItemsBatch("events", events);
+        set({ events });
       }
     } catch (err) {
       console.error("Error fetching events:", err);
@@ -102,6 +135,49 @@ export const useCalendarStore = create<CalendarState>((set, get) => ({
   },
 
   addCalendar: async (summary, backgroundColor) => {
+    const isOffline = typeof window !== "undefined" && !window.navigator.onLine;
+
+    if (isOffline) {
+      const tempId = `temp_cal_${Date.now()}`;
+      const newCal: Calendar = {
+        userId: "local",
+        id: tempId,
+        summary,
+        backgroundColor,
+        foregroundColor: "text-white",
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        sharedUrl: null,
+      };
+
+      try {
+        await saveOfflineItem("calendars", newCal);
+        await saveOfflineItem("syncQueue", {
+          id: `op_${tempId}`,
+          actionName: "createCalendar",
+          payload: {
+            id: tempId,
+            summary,
+            backgroundColor,
+            foregroundColor: "text-white",
+          },
+          timestamp: Date.now(),
+        });
+
+        set((state) => ({
+          calendars: [...state.calendars, newCal],
+          activeCalendarIds: [...state.activeCalendarIds, tempId],
+        }));
+
+        toast.success("Agenda adicionada offline!");
+        return true;
+      } catch (err) {
+        console.error(err);
+        toast.error("Erro ao adicionar agenda offline.");
+        return false;
+      }
+    }
+
     const toastId = toast.loading("Adicionando agenda...");
     try {
       const result = await createCalendarAction({
@@ -110,6 +186,8 @@ export const useCalendarStore = create<CalendarState>((set, get) => ({
         foregroundColor: "text-white",
       });
       if (result?.data?.success && result.data.calendar) {
+        const cal = result.data.calendar;
+        await saveOfflineItem("calendars", cal);
         toast.success("Agenda adicionada com sucesso!", { id: toastId });
         await get().fetchCalendars();
         return true;
@@ -124,6 +202,11 @@ export const useCalendarStore = create<CalendarState>((set, get) => ({
   },
 
   importCalendar: async (url, backgroundColor) => {
+    if (typeof window !== "undefined" && !window.navigator.onLine) {
+      toast.error("Importação de agenda compartilhada requer internet.");
+      return false;
+    }
+
     const toastId = toast.loading("Importando agenda compartilhada...");
     try {
       const result = await importSharedCalendarAction({
@@ -131,6 +214,8 @@ export const useCalendarStore = create<CalendarState>((set, get) => ({
         backgroundColor,
       });
       if (result?.data?.success && result.data.calendar) {
+        const cal = result.data.calendar;
+        await saveOfflineItem("calendars", cal);
         toast.success("Agenda importada com sucesso!", { id: toastId });
         await get().fetchCalendars();
         await get().fetchEvents();
@@ -146,6 +231,11 @@ export const useCalendarStore = create<CalendarState>((set, get) => ({
   },
 
   syncCalendar: async (id) => {
+    if (typeof window !== "undefined" && !window.navigator.onLine) {
+      toast.error("Sincronização de agenda externa requer internet.");
+      return false;
+    }
+
     const toastId = toast.loading("Sincronizando agenda...");
     try {
       const result = await syncCalendarAction({ id });
@@ -164,10 +254,37 @@ export const useCalendarStore = create<CalendarState>((set, get) => ({
   },
 
   removeCalendar: async (id) => {
+    const isOffline = typeof window !== "undefined" && !window.navigator.onLine;
+
+    if (isOffline) {
+      try {
+        await deleteOfflineItem("calendars", id);
+        await saveOfflineItem("syncQueue", {
+          id: `op_del_cal_${id}_${Date.now()}`,
+          actionName: "deleteCalendar",
+          payload: { id },
+          timestamp: Date.now(),
+        });
+
+        set((state) => ({
+          calendars: state.calendars.filter((c) => c.id !== id),
+          activeCalendarIds: state.activeCalendarIds.filter((cid) => cid !== id),
+        }));
+
+        toast.success("Agenda removida offline!");
+        return true;
+      } catch (err) {
+        console.error(err);
+        toast.error("Erro ao remover agenda offline.");
+        return false;
+      }
+    }
+
     const toastId = toast.loading("Removendo agenda...");
     try {
       const result = await deleteCalendarAction({ id });
       if (result?.data?.success) {
+        await deleteOfflineItem("calendars", id);
         toast.success("Agenda removida com sucesso!", { id: toastId });
         // Clean up from active filter
         set({

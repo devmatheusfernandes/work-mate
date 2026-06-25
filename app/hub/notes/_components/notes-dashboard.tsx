@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useCallback } from "react";
+import { useMemo, useState, useCallback, useEffect } from "react";
 import { motion } from "framer-motion";
 import { Folder, Note, Tag } from "@/modules/notes/notes.schema";
 import { Header, type HeaderAction } from "@/components/layout/header";
@@ -16,6 +16,8 @@ import { toast } from "sonner";
 import { updateNoteAction, updateFolderAction, embedMultipleNotesNowAction } from "@/modules/notes/notes.actions";
 import { useDevice } from "@/hooks/ui/use-device";
 import { SearchBar } from "@/components/ui/search-bar";
+import { saveOfflineItem, getAllOfflineItems, saveOfflineItemsBatch } from "@/lib/offline-db";
+import { NoteDetailsVault } from "./note-details-vault";
 
 interface NotesDashboardProps {
   notes: Note[];
@@ -37,13 +39,39 @@ export function NotesDashboard({
   const { isMobile } = useDevice();
 
   const [localNotes, setLocalNotes] = useState(notes);
+  const [localFolders, setLocalFolders] = useState(folders);
+  const [localTags, setLocalTags] = useState(tags);
   const [prevNotes, setPrevNotes] = useState(notes);
   const [isDragOverGrid, setIsDragOverGrid] = useState(false);
+  const [editingNote, setEditingNote] = useState<Note | null>(null);
+  const [noteVaultOpen, setNoteVaultOpen] = useState(false);
 
   if (notes !== prevNotes) {
     setLocalNotes(notes);
+    setLocalFolders(folders);
+    setLocalTags(tags);
     setPrevNotes(notes);
   }
+
+  useEffect(() => {
+    async function syncOfflineData() {
+      if (typeof window !== "undefined") {
+        if (window.navigator.onLine) {
+          await saveOfflineItemsBatch("notes", notes);
+          await saveOfflineItemsBatch("folders", folders);
+          await saveOfflineItemsBatch("tags", tags);
+        } else {
+          const dbNotes = await getAllOfflineItems<Note>("notes");
+          const dbFolders = await getAllOfflineItems<Folder>("folders");
+          const dbTags = await getAllOfflineItems<Tag>("tags");
+          if (dbNotes.length > 0) setLocalNotes(dbNotes);
+          if (dbFolders.length > 0) setLocalFolders(dbFolders);
+          if (dbTags.length > 0) setLocalTags(dbTags);
+        }
+      }
+    }
+    syncOfflineData();
+  }, [notes, folders, tags]);
 
   // Bulk Selection States
   const [selectedNoteIds, setSelectedNoteIds] = useState<Set<string>>(new Set());
@@ -56,14 +84,35 @@ export function NotesDashboard({
       apiCall: () => Promise<{ data?: { success?: boolean } } | undefined>
     ) => {
       const prev = [...localNotes];
+      const updatedNote = localNotes.find((n) => n.id === id);
+      const newNote = updatedNote ? ({ ...updatedNote, ...updates } as Note) : null;
+
       setLocalNotes((current) =>
         current.map((n) => (n.id === id ? ({ ...n, ...updates } as Note) : n))
       );
+
+      if (typeof window !== "undefined" && !window.navigator.onLine) {
+        if (newNote) {
+          await saveOfflineItem("notes", newNote);
+        }
+        const syncOp = {
+          id: `op_${id}_${Date.now()}`,
+          actionName: "updateNote",
+          payload: { id, updates },
+          timestamp: Date.now(),
+        };
+        await saveOfflineItem("syncQueue", syncOp);
+        toast.success("Alteração salva localmente (offline)");
+        return;
+      }
+
       try {
         const result = await apiCall();
         if (!result?.data?.success) {
           setLocalNotes(prev);
           toast.error("Erro ao sincronizar alteração.");
+        } else if (newNote) {
+          await saveOfflineItem("notes", newNote);
         }
       } catch (err) {
         console.error(err);
@@ -77,8 +126,8 @@ export function NotesDashboard({
   // Derive current folder details
   const currentFolder = useMemo(() => {
     if (!activeFolderId) return null;
-    return folders.find((f) => f.id === activeFolderId) ?? null;
-  }, [folders, activeFolderId]);
+    return localFolders.find((f) => f.id === activeFolderId) ?? null;
+  }, [localFolders, activeFolderId]);
 
   // Back button href for sub-folders
   const backHref = useMemo(() => {
@@ -96,10 +145,10 @@ export function NotesDashboard({
 
   // Filter folders and notes inside active folder (exclude tasks)
   const displayedFolders = useMemo(() => {
-    return folders.filter(
+    return localFolders.filter(
       (f) => f.parentId === activeFolderId && !f.archived && !f.trashed
     );
-  }, [folders, activeFolderId]);
+  }, [localFolders, activeFolderId]);
 
   const displayedNotes = useMemo(() => {
     return localNotes.filter(
@@ -171,18 +220,49 @@ export function NotesDashboard({
   const handleBulkDelete = async () => {
     const totalCount = selectedNoteIds.size + selectedFolderIds.size;
     const toastId = toast.loading(`Enviando ${totalCount} itens para a lixeira...`);
+    const isOffline = typeof window !== "undefined" && !window.navigator.onLine;
 
     try {
       // Move selected notes to trash
       for (const id of Array.from(selectedNoteIds)) {
-        await updateNoteAction({ id, updates: { trashed: true, archived: false } });
+        if (isOffline) {
+          const n = localNotes.find((item) => item.id === id);
+          if (n) {
+            const updated = { ...n, trashed: true, archived: false } as Note;
+            await saveOfflineItem("notes", updated);
+            setLocalNotes((curr) => curr.map((item) => (item.id === id ? updated : item)));
+            await saveOfflineItem("syncQueue", {
+              id: `op_${id}_${Date.now()}`,
+              actionName: "updateNote",
+              payload: { id, updates: { trashed: true, archived: false } },
+              timestamp: Date.now(),
+            });
+          }
+        } else {
+          await updateNoteAction({ id, updates: { trashed: true, archived: false } });
+        }
       }
       // Move selected folders to trash
       for (const id of Array.from(selectedFolderIds)) {
-        await updateFolderAction({ id, updates: { trashed: true, archived: false } });
+        if (isOffline) {
+          const f = localFolders.find((item) => item.id === id);
+          if (f) {
+            const updated = { ...f, trashed: true, archived: false } as Folder;
+            await saveOfflineItem("folders", updated);
+            setLocalFolders((curr) => curr.map((item) => (item.id === id ? updated : item)));
+            await saveOfflineItem("syncQueue", {
+              id: `op_${id}_${Date.now()}`,
+              actionName: "updateFolder",
+              payload: { id, updates: { trashed: true, archived: false } },
+              timestamp: Date.now(),
+            });
+          }
+        } else {
+          await updateFolderAction({ id, updates: { trashed: true, archived: false } });
+        }
       }
 
-      toast.success("Itens enviados para a lixeira!", { id: toastId });
+      toast.success(isOffline ? "Itens enviados para a lixeira offline!" : "Itens enviados para a lixeira!", { id: toastId });
       handleClearSelection();
     } catch {
       toast.error("Erro ao enviar alguns itens para a lixeira.", { id: toastId });
@@ -192,18 +272,49 @@ export function NotesDashboard({
   const handleBulkArchive = async () => {
     const totalCount = selectedNoteIds.size + selectedFolderIds.size;
     const toastId = toast.loading(`Arquivando ${totalCount} itens...`);
+    const isOffline = typeof window !== "undefined" && !window.navigator.onLine;
 
     try {
       // Archive notes
       for (const id of Array.from(selectedNoteIds)) {
-        await updateNoteAction({ id, updates: { archived: true } });
+        if (isOffline) {
+          const n = localNotes.find((item) => item.id === id);
+          if (n) {
+            const updated = { ...n, archived: true } as Note;
+            await saveOfflineItem("notes", updated);
+            setLocalNotes((curr) => curr.map((item) => (item.id === id ? updated : item)));
+            await saveOfflineItem("syncQueue", {
+              id: `op_${id}_${Date.now()}`,
+              actionName: "updateNote",
+              payload: { id, updates: { archived: true } },
+              timestamp: Date.now(),
+            });
+          }
+        } else {
+          await updateNoteAction({ id, updates: { archived: true } });
+        }
       }
       // Archive folders
       for (const id of Array.from(selectedFolderIds)) {
-        await updateFolderAction({ id, updates: { archived: true } });
+        if (isOffline) {
+          const f = localFolders.find((item) => item.id === id);
+          if (f) {
+            const updated = { ...f, archived: true } as Folder;
+            await saveOfflineItem("folders", updated);
+            setLocalFolders((curr) => curr.map((item) => (item.id === id ? updated : item)));
+            await saveOfflineItem("syncQueue", {
+              id: `op_${id}_${Date.now()}`,
+              actionName: "updateFolder",
+              payload: { id, updates: { archived: true } },
+              timestamp: Date.now(),
+            });
+          }
+        } else {
+          await updateFolderAction({ id, updates: { archived: true } });
+        }
       }
 
-      toast.success("Itens arquivados!", { id: toastId });
+      toast.success(isOffline ? "Itens arquivados offline!" : "Itens arquivados!", { id: toastId });
       handleClearSelection();
     } catch {
       toast.error("Erro ao arquivar alguns itens.", { id: toastId });
@@ -211,6 +322,11 @@ export function NotesDashboard({
   };
 
   const handleBulkEmbed = async () => {
+    if (typeof window !== "undefined" && !window.navigator.onLine) {
+      toast.error("Vetorização com IA requer conexão com a internet.");
+      return;
+    }
+
     const totalCount = selectedNoteIds.size;
     if (totalCount === 0) return;
 
@@ -308,7 +424,7 @@ export function NotesDashboard({
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 w-full">
             <div className="flex-1 min-w-0">
               <TagChips
-                tags={tags}
+                tags={localTags}
                 selectedTagId={selectedTagId}
                 onSelectTag={setSelectedTagId}
               />
@@ -381,6 +497,10 @@ export function NotesDashboard({
                             isSelected={selectedNoteIds.has(note.id)}
                             onToggleSelect={() => toggleSelectNote(note.id)}
                             isSelectionActive={isSelectionActive}
+                            onOpenNote={(n) => {
+                              setEditingNote(n);
+                              setNoteVaultOpen(true);
+                            }}
                           />
                         </motion.div>
                       ))}
@@ -419,10 +539,34 @@ export function NotesDashboard({
         {/* Floating Create FAB */}
         <CreateButton 
           activeFolderId={activeFolderId} 
-          tags={tags} 
+          tags={localTags} 
           isTasksSidebarOpen={sidebarOpen}
           isTasksSidebarExpanded={tasksSidebarExpanded}
           onOpenTasksSidebar={() => setSidebarOpen(true)}
+          onNoteCreatedOffline={(newNote) => {
+            setLocalNotes((curr) => [newNote, ...curr]);
+            if (newNote.type === "note" || newNote.type === "pdf") {
+              setEditingNote(newNote);
+              setNoteVaultOpen(true);
+            }
+          }}
+          onFolderCreatedOffline={(newFolder) => {
+            setLocalFolders((curr) => [newFolder, ...curr]);
+          }}
+          onTagCreatedOffline={(newTag) => {
+            setLocalTags((curr) => [newTag, ...curr]);
+          }}
+          onTagDeletedOffline={(tagId) => {
+            setLocalTags((curr) => curr.filter((t) => t.id !== tagId));
+          }}
+        />
+        <NoteDetailsVault
+          note={editingNote}
+          open={noteVaultOpen}
+          onOpenChange={setNoteVaultOpen}
+          onNoteUpdated={(updatedNote) => {
+            setLocalNotes((curr) => curr.map((n) => (n.id === updatedNote.id ? updatedNote : n)));
+          }}
         />
       </div>
 
