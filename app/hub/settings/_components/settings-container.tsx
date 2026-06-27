@@ -99,7 +99,7 @@ export function SettingsContainer({ initialCalendars, user }: SettingsContainerP
   };
 
   return (
-    <div className="flex flex-col gap-6 md:flex-row md:items-start max-w-6xl mx-auto w-full pb-16">
+    <div className="flex flex-col gap-6 md:flex-row md:items-start w-full pb-16">
       {/* Tabs Sidebar Selector */}
       <aside className="w-full md:w-64 shrink-0 flex flex-row md:flex-col gap-1.5 border-b md:border-b-0 md:border-r border-border/30 pb-4 md:pb-0 md:pr-4">
         <button
@@ -132,8 +132,8 @@ export function SettingsContainer({ initialCalendars, user }: SettingsContainerP
       <div className="flex-1 w-full animate-in fade-in slide-in-from-bottom-4 duration-300">
         {activeTab === "geral" ? (
           <div className="space-y-6">
-            {/* User Profile Card */}
-            <div className="card p-5 space-y-4">
+            {/* User Profile item */}
+            <div className="item p-5 space-y-4">
               <h3 className="text-sm font-bold uppercase tracking-wider text-muted-foreground/60">
                 Perfil do Usuário
               </h3>
@@ -150,7 +150,7 @@ export function SettingsContainer({ initialCalendars, user }: SettingsContainerP
             </div>
 
             {/* Mode (Theme Mode) Selector */}
-            <div className="card p-5 space-y-4">
+            <div className="item p-5 space-y-4">
               <h3 className="text-sm font-bold uppercase tracking-wider text-muted-foreground/60">
                 Tema do Sistema
               </h3>
@@ -182,7 +182,7 @@ export function SettingsContainer({ initialCalendars, user }: SettingsContainerP
             </div>
 
             {/* Theme Colors */}
-            <div className="card p-5 space-y-4">
+            <div className="item p-5 space-y-4">
               <h3 className="text-sm font-bold uppercase tracking-wider text-muted-foreground/60">
                 Cor de Destaque (Accent Color)
               </h3>
@@ -210,7 +210,7 @@ export function SettingsContainer({ initialCalendars, user }: SettingsContainerP
         ) : (
           <div className="space-y-6">
             {/* Add/Import Calendar Form */}
-            <div className="card p-5 space-y-4">
+            <div className="item p-5 space-y-4">
               <h3 className="text-sm font-bold uppercase tracking-wider text-muted-foreground/60">
                 Gerenciar Calendários
               </h3>
@@ -345,7 +345,7 @@ export function SettingsContainer({ initialCalendars, user }: SettingsContainerP
             </div>
 
             {/* List Calendars */}
-            <div className="card p-5 space-y-4">
+            <div className="item p-5 space-y-4">
               <h3 className="text-sm font-bold uppercase tracking-wider text-muted-foreground/60">
                 Meus Calendários
               </h3>

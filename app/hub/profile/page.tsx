@@ -1,5 +1,5 @@
 import { Header } from "@/components/layout/header";
-import { Mail, Shield, Briefcase, Calendar } from "lucide-react";
+import { Mail, Shield, Calendar } from "lucide-react";
 import { getCurrentUser } from "@/lib/safe-action";
 import { redirect } from "next/navigation";
 
@@ -44,14 +44,6 @@ export default async function ProfilePage() {
                             <div className="flex flex-col text-left">
                                 <span className="text-xs text-muted-foreground/60 font-semibold uppercase tracking-wider">E-mail</span>
                                 <span className="text-sm font-medium text-foreground">{user.email}</span>
-                            </div>
-                        </div>
-
-                        <div className="flex items-center gap-3 text-muted-foreground">
-                            <Briefcase className="h-5 w-5 text-primary shrink-0" />
-                            <div className="flex flex-col text-left">
-                                <span className="text-xs text-muted-foreground/60 font-semibold uppercase tracking-wider">Departamento</span>
-                                <span className="text-sm font-medium text-foreground">Tecnologia & Produto</span>
                             </div>
                         </div>
 

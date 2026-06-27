@@ -12,16 +12,17 @@ export default async function SettingsPage() {
   const calendars = await calendarService.getCalendars(user.id);
 
   return (
-    <div className="w-full h-full">
+    <>
       <Header
         title="Configurações"
         subtitle="Gerencie sua conta, aparência e calendário"
+        className="contents"
         showSubHeader={true}
         user={user}
       />
       <main className="container">
         <SettingsContainer initialCalendars={calendars} user={user} />
       </main>
-    </div>
+    </>
   );
 }

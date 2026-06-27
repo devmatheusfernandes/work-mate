@@ -143,7 +143,7 @@ function ExpandedTaskCard({
       onDragStart={handleDragStart}
       onClick={onClick}
       className={cn(
-        "w-full p-3 rounded-lg border border-border/40 bg-card cursor-pointer",
+        "w-full p-3 rounded-lg border border-border/40 bg-black cursor-pointer",
         "hover:border-border hover:bg-muted/10 transition-all duration-200",
         "flex flex-col gap-2"
       )}
