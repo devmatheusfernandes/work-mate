@@ -1,4 +1,5 @@
 import { notesRepository } from "./notes.repository";
+import { notesStorageService } from "./notes-storage.service";
 import { Note, Folder, Tag, CreateNoteDTO, CreateFolderDTO, CreateTagDTO } from "./notes.schema";
 import { vectorService } from "../vector/vector.service";
 
@@ -150,6 +151,17 @@ function syncHtmlWithSubtasks(content: string | null | undefined, subtasks: { ti
   return syncedContent;
 }
 
+/** Extract all image src URLs from HTML content */
+function extractImageUrls(html: string): string[] {
+  const urls: string[] = [];
+  const regex = /<img[^>]+src=["']([^"']+)["']/gi;
+  let match;
+  while ((match = regex.exec(html)) !== null) {
+    urls.push(match[1]);
+  }
+  return urls;
+}
+
 export const notesService = {
   // --- Notes Services ---
   async getNotes(userId: string): Promise<Note[]> {
@@ -268,8 +280,13 @@ export const notesService = {
         data.taskSubtasks = extractSubtasksFromHtml(data.content);
       }
     }
-    
+
     const updatedNote = await notesRepository.updateNote(userId, id, data);
+
+    // Sync images: soft-delete any images no longer present in the content
+    if (data.content !== undefined && typeof data.content === "string") {
+      await notesService.syncNoteImages(id, data.content);
+    }
 
     let isVectorized = false;
     // Se a nota foi para a lixeira, removemos da fila de embeddings
@@ -425,5 +442,61 @@ export const notesService = {
 
   getFormattedContent(note: Note): string {
     return getContentToEmbed(note);
+  },
+
+  /** Upload an image to Supabase Storage and register in editor_images */
+  async uploadEditorImage(
+    userId: string,
+    noteId: string,
+    fileBuffer: Buffer,
+    fileName: string,
+    mimeType: string,
+    fileSize: number
+  ): Promise<{ imageId: string; fileUrl: string }> {
+    const { fileUrl, filePath } = await notesStorageService.uploadImage(
+      userId,
+      noteId,
+      fileBuffer,
+      fileName,
+      mimeType
+    );
+
+    const imageId = "img_" + Math.random().toString(36).substring(2, 11);
+    await notesRepository.createEditorImage(userId, {
+      id: imageId,
+      noteId,
+      fileUrl,
+      filePath,
+      fileSize,
+    });
+
+    return { imageId, fileUrl };
+  },
+
+  /**
+   * Compares current DB images for a note against the URLs present in the
+   * updated HTML content. Images no longer referenced are soft-deleted;
+   * images that have come back (undo) are restored.
+   */
+  async syncNoteImages(noteId: string, newContent: string): Promise<void> {
+    const existingImages = await notesRepository.getEditorImagesByNoteId(noteId);
+    if (existingImages.length === 0) return;
+
+    const activeUrls = new Set(extractImageUrls(newContent));
+
+    const toSoftDelete = existingImages
+      .filter((img) => !activeUrls.has(img.fileUrl) && !img.deletedAt)
+      .map((img) => img.id);
+
+    const toRestore = existingImages
+      .filter((img) => activeUrls.has(img.fileUrl) && img.deletedAt)
+      .map((img) => img.id);
+
+    if (toSoftDelete.length > 0) {
+      await notesRepository.softDeleteEditorImages(toSoftDelete);
+    }
+    if (toRestore.length > 0) {
+      await notesRepository.markEditorImagesAsActive(toRestore);
+    }
   },
 };

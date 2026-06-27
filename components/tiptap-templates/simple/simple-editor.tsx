@@ -70,7 +70,7 @@ import { useCursorVisibility } from "@/hooks/use-cursor-visibility"
 import { useRefRect } from "@/hooks/use-element-rect"
 
 // --- Lib ---
-import { handleImageUpload, MAX_FILE_SIZE } from "@/lib/tiptap-utils"
+import { handleImageUpload, createImageUploadHandler, MAX_FILE_SIZE } from "@/lib/tiptap-utils"
 
 // --- Styles ---
 import "@/components/tiptap-templates/simple/simple-editor.scss"
@@ -78,6 +78,7 @@ import "@/components/tiptap-templates/simple/simple-editor.scss"
 interface SimpleEditorProps {
   content?: Content;
   title?: string;
+  noteId?: string;
   onChange?: (html: string) => void;
   onTitleChange?: (newTitle: string) => void;
   children?: React.ReactNode;
@@ -234,6 +235,7 @@ const MobileToolbarContent = ({
 export function SimpleEditor({
   content = "",
   title = "Nova Nota",
+  noteId,
   onChange,
   onTitleChange,
   children,
@@ -287,7 +289,7 @@ export function SimpleEditor({
         accept: "image/*",
         maxSize: MAX_FILE_SIZE,
         limit: 3,
-        upload: handleImageUpload,
+        upload: noteId ? createImageUploadHandler(noteId) : handleImageUpload,
         onError: (error) => console.error("Upload failed:", error),
       }),
     ],

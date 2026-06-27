@@ -60,6 +60,54 @@ export const notesStorageService = {
     };
   },
 
+  // Realiza o upload de imagens do editor para o Supabase Storage
+  async uploadImage(
+    userId: string,
+    noteId: string,
+    fileBuffer: Buffer,
+    fileName: string,
+    mimeType: string
+  ): Promise<{ fileUrl: string; filePath: string }> {
+    const fileExtension = fileName.split(".").pop() || "png";
+    const randomId = Math.random().toString(36).substring(2, 11);
+    const filePath = `users/${userId}/images/${noteId}/${randomId}.${fileExtension}`;
+
+    const { error } = await supabase.storage
+      .from(BUCKET_NAME)
+      .upload(filePath, fileBuffer, {
+        contentType: mimeType,
+        upsert: true,
+      });
+
+    if (error) {
+      console.error("Erro no upload do Supabase Storage:", error);
+      throw new Error(`Falha ao fazer upload da imagem: ${error.message}`);
+    }
+
+    const { data: urlData } = supabase.storage
+      .from(BUCKET_NAME)
+      .getPublicUrl(filePath);
+
+    return {
+      fileUrl: urlData.publicUrl,
+      filePath,
+    };
+  },
+
+  // Deleta um arquivo de imagem do Supabase Storage
+  async deleteImage(filePath: string): Promise<void> {
+    if (!filePath) return;
+
+    const { error } = await supabase.storage
+      .from(BUCKET_NAME)
+      .remove([filePath]);
+
+    if (error) {
+      console.error(`Erro ao deletar imagem "${filePath}" do Supabase Storage:`, error);
+      throw new Error(`Falha ao deletar imagem do storage: ${error.message}`);
+    }
+  },
+
   // Deleta um arquivo PDF do Supabase Storage
   async deletePdf(filePath: string): Promise<void> {
     if (!filePath) return;

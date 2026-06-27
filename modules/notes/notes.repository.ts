@@ -5,9 +5,10 @@ import {
   Tag, 
   notesTable, 
   foldersTable, 
-  tagsTable 
+  tagsTable,
+  editorImagesTable
 } from "./notes.schema";
-import { eq, and, sql } from "drizzle-orm";
+import { eq, and, sql, inArray } from "drizzle-orm";
 
 type NoteFromDb = typeof notesTable.$inferSelect;
 type FolderFromDb = typeof foldersTable.$inferSelect;
@@ -315,4 +316,58 @@ export const notesRepository = {
       return true;
     });
   },
+
+  // --- Editor Images ---
+  async createEditorImage(userId: string, image: { id: string; noteId: string; fileUrl: string; filePath: string; fileSize?: number }) {
+    const dbValues = {
+      ...image,
+      userId,
+      createdAt: new Date(),
+      deletedAt: null,
+    };
+
+    const [inserted] = await db
+      .insert(editorImagesTable)
+      .values(dbValues)
+      .returning();
+
+    return inserted;
+  },
+
+  async getEditorImagesByNoteId(noteId: string) {
+    return db
+      .select()
+      .from(editorImagesTable)
+      .where(eq(editorImagesTable.noteId, noteId));
+  },
+
+  async softDeleteEditorImages(ids: string[]) {
+    if (ids.length === 0) return;
+    await db
+      .update(editorImagesTable)
+      .set({ deletedAt: new Date() })
+      .where(inArray(editorImagesTable.id, ids));
+  },
+
+  async markEditorImagesAsActive(ids: string[]) {
+    if (ids.length === 0) return;
+    await db
+      .update(editorImagesTable)
+      .set({ deletedAt: null })
+      .where(inArray(editorImagesTable.id, ids));
+  },
+
+  async getExpiredDeletedEditorImages(olderThan: Date) {
+    return db
+      .select()
+      .from(editorImagesTable)
+      .where(sql`${editorImagesTable.deletedAt} <= ${olderThan}`);
+  },
+
+  async hardDeleteEditorImage(id: string) {
+    await db
+      .delete(editorImagesTable)
+      .where(eq(editorImagesTable.id, id));
+  }
 };
+

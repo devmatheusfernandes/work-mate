@@ -167,3 +167,15 @@ export const notesTable = pgTable("notes", {
   taskShouldNotify: boolean("task_should_notify").notNull().default(false),
 });
 
+export const editorImagesTable = pgTable("editor_images", {
+  id: text("id").primaryKey(),
+  userId: text("user_id").notNull(),
+  noteId: text("note_id").references(() => notesTable.id, { onDelete: "cascade" }),
+  fileUrl: text("file_url").notNull(),
+  filePath: text("file_path").notNull(),
+  fileSize: integer("file_size"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  deletedAt: timestamp("deleted_at"),
+});
+
+

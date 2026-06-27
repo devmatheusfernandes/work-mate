@@ -4,6 +4,7 @@ on:
   schedule:
     - cron: '*/10 * * * *' # Executa a fila de embeddings a cada 10 minutos
     - cron: '0 0 * * *'    # Limpa storage diariamente à meia-noite
+    - cron: '0 3 * * 0'    # Purga imagens deletadas toda semana (domingo às 3h)
   workflow_dispatch:
     inputs:
       job:
@@ -14,6 +15,7 @@ on:
         options:
           - queue
           - cleanup
+          - cleanup-images
           - ambos
 
 jobs:
@@ -67,3 +69,25 @@ jobs:
             -H "Authorization: Bearer $CRON_SECRET"
           echo "Limpeza de storage concluída com sucesso."
 
+      - name: Purga de Imagens Deletadas (Editor)
+        if: |
+          github.event_name == 'schedule' && github.event.schedule == '0 3 * * 0' ||
+          github.event_name == 'workflow_dispatch' && (github.event.inputs.job == 'cleanup-images' || github.event.inputs.job == 'ambos')
+        env:
+          APP_URL: ${{ secrets.APP_URL }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          if [ -z "$APP_URL" ]; then
+            echo "::error::A variável APP_URL está vazia. Configure o secret APP_URL nas configurações do repositório."
+            exit 1
+          fi
+
+          URL="$APP_URL"
+          if [[ ! "$URL" =~ ^https?:// ]]; then
+            URL="https://$URL"
+          fi
+
+          echo "Disparando purga de imagens deletadas em $URL..."
+          curl -fail -X GET "$URL/api/cron/cleanup-images" \
+            -H "Authorization: Bearer $CRON_SECRET"
+          echo "Purga de imagens concluída com sucesso."

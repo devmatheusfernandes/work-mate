@@ -360,7 +360,6 @@ export function selectionWithinConvertibleTypes(
 export const handleImageUpload = async (
   file: File,
   onProgress?: (event: { progress: number }) => void,
-  abortSignal?: AbortSignal
 ): Promise<string> => {
   // Validate file
   if (!file) {
@@ -373,17 +372,49 @@ export const handleImageUpload = async (
     )
   }
 
-  // For demo/testing: Simulate upload progress. In production, replace the following code
-  // with your own upload implementation.
-  for (let progress = 0; progress <= 100; progress += 10) {
-    if (abortSignal?.aborted) {
-      throw new Error("Upload cancelled")
-    }
-    await new Promise((resolve) => setTimeout(resolve, 500))
-    onProgress?.({ progress })
-  }
+  // Fallback: no noteId — use object URL as a temporary preview
+  onProgress?.({ progress: 100 })
+  return URL.createObjectURL(file)
+}
 
-  return "/images/tiptap-ui-placeholder-image.jpg"
+/**
+ * Creates an image upload handler bound to a specific noteId.
+ * Uploads to /api/notes/upload-image and returns the Supabase public URL.
+ */
+export const createImageUploadHandler = (noteId: string) => {
+  return async (
+    file: File,
+    onProgress?: (event: { progress: number }) => void,
+    abortSignal?: AbortSignal
+  ): Promise<string> => {
+    if (!file) throw new Error("No file provided")
+    if (file.size > MAX_FILE_SIZE) {
+      throw new Error(`File size exceeds maximum allowed (${MAX_FILE_SIZE / (1024 * 1024)}MB)`)
+    }
+
+    onProgress?.({ progress: 10 })
+
+    const formData = new FormData()
+    formData.append("file", file)
+    formData.append("noteId", noteId)
+
+    const res = await fetch("/api/notes/upload-image", {
+      method: "POST",
+      body: formData,
+      signal: abortSignal,
+    })
+
+    onProgress?.({ progress: 90 })
+
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}))
+      throw new Error(body?.error ?? "Falha no upload da imagem")
+    }
+
+    const { url } = await res.json()
+    onProgress?.({ progress: 100 })
+    return url as string
+  }
 }
 
 type ProtocolOptions = {

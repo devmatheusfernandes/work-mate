@@ -96,6 +96,7 @@ export function NoteEditorClient({ note, tags = [] }: NoteEditorClientProps) {
       <SimpleEditor
         title={noteTitle}
         content={noteContent}
+        noteId={note.id}
         onChange={handleContentChange}
         onTitleChange={handleTitleChange}
       >

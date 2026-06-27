@@ -156,6 +156,7 @@ export function NoteDetailsVault({
             <SimpleEditor
               title={noteTitle}
               content={noteContent}
+              noteId={note.id}
               onChange={handleContentChange}
               onTitleChange={handleTitleChange}
             />
