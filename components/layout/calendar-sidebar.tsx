@@ -9,16 +9,13 @@ import {
   MapPin,
   FileText,
   Clock,
-  Settings,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useDevice } from "@/hooks/ui/use-device";
 import { Vault, VaultContent, VaultTitle } from "@/components/ui/vault";
 import { cn } from "@/lib/utils";
-import { useRouter } from "next/navigation";
 
 export function CalendarSidebar() {
-  const router = useRouter();
   const {
     isSidebarOpen,
     setSidebarOpen,
@@ -63,11 +60,6 @@ export function CalendarSidebar() {
     });
   };
 
-  const handleGoToSettings = () => {
-    setSidebarOpen(false);
-    router.push("/hub/settings");
-  };
-
   const renderSidebarContent = () => {
     return (
       <div className="h-full w-full flex flex-col bg-card rounded-xl">
@@ -79,13 +71,6 @@ export function CalendarSidebar() {
               Agenda
             </span>
           </div>
-          <button
-            onClick={handleGoToSettings}
-            className="p-1.5 rounded-full hover:bg-muted text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
-            title="Gerenciar Agendas"
-          >
-            <Settings className="size-3.5" />
-          </button>
         </div>
 
         {/* Date Switching Controls */}

@@ -1,7 +1,7 @@
 "use client";
 
 import { usePathname, useRouter } from "next/navigation";
-import { ChevronRight, Sparkles } from "lucide-react";
+import { Sparkles } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useDevice } from "@/hooks/ui/use-device";
 import { useChatStore } from "@/modules/chat/chat.store";
@@ -82,16 +82,6 @@ export function ChatSidebar() {
           >
             <div className="h-full w-full pl-[2px] py-2 pr-2">
               <div className="h-full w-[380px] bg-card rounded-xl overflow-hidden flex flex-col relative border border-border/20">
-                {/* Header Close Arrow */}
-                <div className="absolute top-2.5 left-2 z-20">
-                  <button
-                    onClick={() => setSidebarOpen(false)}
-                    className="flex items-center justify-center size-7 rounded-full hover:bg-muted text-muted-foreground transition-colors cursor-pointer"
-                  >
-                    <ChevronRight className="size-4" />
-                  </button>
-                </div>
-
                 {/* Chat Content */}
                 <div className="flex-1 h-full w-full">
                   <ChatInterface

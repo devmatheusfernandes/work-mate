@@ -9,14 +9,14 @@ import {
   MessageSquare, 
   Sparkles, 
   ArrowUp,
-  Maximize2,
   Plus,
   Archive,
   Menu,
   X,
   FileText,
   CheckCircle2,
-  Calendar as CalendarIcon
+  Calendar as CalendarIcon,
+  ChevronRight
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -25,7 +25,8 @@ import { Button } from "@/components/ui/button";
 import { useCalendarStore } from "@/modules/calendar/calendar.store";
 import { getNotesAction } from "@/modules/notes/notes.actions";
 import { Note } from "@/modules/notes/notes.schema";
-import { SidebarTrigger } from "@/components/layout/sidebar-trigger";
+import { Header } from "@/components/layout/header";
+import { useDevice } from "@/hooks/ui/use-device";
 
 interface ChatInterfaceProps {
   isSidebar?: boolean;
@@ -52,9 +53,10 @@ const SUGGESTIONS = [
 
 export function ChatInterface({
   isSidebar = false,
-  onNavigateToFullPage,
 }: ChatInterfaceProps) {
   const router = useRouter();
+  const { isMobile, isStandalone } = useDevice();
+  const isMobileOrPwa = isMobile || isStandalone;
   const {
     sessions,
     messages,
@@ -316,7 +318,7 @@ export function ChatInterface({
     });
   };
 
-  return (
+  const content = (
     <div className={cn(
       "flex h-full w-full overflow-hidden relative",
       isSidebar ? "bg-transparent" : "bg-background"
@@ -558,11 +560,11 @@ export function ChatInterface({
       <div className="flex-1 flex flex-col min-w-0 h-full">
         {/* Top Header */}
         <div className={cn(
-          "flex items-center justify-between h-12 border-b border-border/30 shrink-0 backdrop-blur-md z-10 px-4",
-          isSidebar ? "bg-card/80 pl-11" : "bg-background/80"
+          "flex items-center justify-between w-full h-12 border-b border-border/30 shrink-0 backdrop-blur-md z-10 px-4",
+          isSidebar ? "bg-card/80" : "bg-background/80"
         )}>
           <div className="flex items-center gap-2">
-            <SidebarTrigger />
+            
             {!isSidebar && (
               <Button
                 variant="ghost"
@@ -599,16 +601,14 @@ export function ChatInterface({
               </Button>
             )}
 
-            {isSidebar && onNavigateToFullPage && (
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-8 w-8 text-muted-foreground hover:text-foreground transition-colors rounded-full shrink-0 cursor-pointer"
-                onClick={onNavigateToFullPage}
-                title="Expandir para tela cheia"
+            
+            {isSidebar && (
+              <button
+                onClick={() => setSidebarOpen(false)}
+                className="flex items-center justify-center size-7 rounded-full hover:bg-muted text-muted-foreground transition-colors cursor-pointer mr-1"
               >
-                <Maximize2 className="size-4" />
-              </Button>
+                <ChevronRight className="size-4" />
+              </button>
             )}
           </div>
         </div>
@@ -1001,4 +1001,17 @@ export function ChatInterface({
       </div>
     </div>
   );
+
+  if (!isSidebar && isMobileOrPwa) {
+    return (
+      <div className="flex flex-col h-full w-full overflow-hidden">
+        <Header title="Assistente IA" showSubHeader={false} />
+        <div className="flex-1 min-h-0">
+          {content}
+        </div>
+      </div>
+    );
+  }
+
+  return content;
 }

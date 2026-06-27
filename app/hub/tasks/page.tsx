@@ -18,7 +18,7 @@ export default async function TasksPage() {
   return (
     <Suspense fallback={<div className="flex h-full items-center justify-center p-8 text-sm text-muted-foreground">Carregando tarefas...</div>}>
       <KanbanBoard tasks={tasks} />
-      <CreateButton activeFolderId={null} tags={tags} />
+      <CreateButton activeFolderId={null} tags={tags} defaultType="task" />
     </Suspense>
   );
 }

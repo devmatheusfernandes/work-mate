@@ -21,6 +21,7 @@ import { StarterKit } from "@tiptap/starter-kit";
 import { TaskItem, TaskList } from "@tiptap/extension-list";
 import { Highlight } from "@tiptap/extension-highlight";
 import { Typography } from "@tiptap/extension-typography";
+import { motion, AnimatePresence } from "framer-motion";
 
 // Styles for the inline editor
 import "@/components/tiptap-node/list-node/list-node.scss";
@@ -53,6 +54,48 @@ interface TaskDetailPanelProps {
   onClose: () => void;
 }
 
+function AnimatedCheckbox({ checked, onChange }: { checked: boolean; onChange: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onChange}
+      className={cn(
+        "shrink-0 size-4.5 rounded border flex items-center justify-center transition-colors cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-primary/50",
+        checked
+          ? "bg-primary border-primary"
+          : "border-border/80 hover:border-primary/50 bg-transparent"
+      )}
+    >
+      <motion.div
+        initial={false}
+        animate={checked ? "checked" : "unchecked"}
+        variants={{
+          checked: { scale: 1, opacity: 1 },
+          unchecked: { scale: 0.5, opacity: 0 },
+        }}
+        transition={{ type: "spring", stiffness: 500, damping: 30 }}
+        className="flex items-center justify-center text-primary-foreground"
+      >
+        <svg
+          className="size-3 stroke-[3px]"
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+        >
+          <motion.path
+            initial={{ pathLength: 0 }}
+            animate={{ pathLength: checked ? 1 : 0 }}
+            transition={{ type: "spring", stiffness: 400, damping: 28, delay: 0.05 }}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            d="M5 13l4 4L19 7"
+          />
+        </svg>
+      </motion.div>
+    </button>
+  );
+}
+
 export function TaskDetailPanel({ task, onClose }: TaskDetailPanelProps) {
   const currentStatus = (task.taskStatus || "to_start") as TaskStatus;
   const [status, setStatus] = useState<TaskStatus>(currentStatus);
@@ -60,6 +103,13 @@ export function TaskDetailPanel({ task, onClose }: TaskDetailPanelProps) {
   const [subtasks, setSubtasks] = useState<Subtask[]>(task.taskSubtasks || []);
   const [shouldNotify, setShouldNotify] = useState(task.taskShouldNotify || false);
   const [newSubtaskTitle, setNewSubtaskTitle] = useState("");
+  const [title, setTitle] = useState(task.title);
+  const [prevTaskTitle, setPrevTaskTitle] = useState(task.title);
+
+  if (task.title !== prevTaskTitle) {
+    setTitle(task.title);
+    setPrevTaskTitle(task.title);
+  }
   const contentRef = useRef<string>(
     typeof task.content === "string" ? task.content : ""
   );
@@ -205,6 +255,33 @@ export function TaskDetailPanel({ task, onClose }: TaskDetailPanelProps) {
 
   return (
     <div className="flex flex-col gap-0 h-full">
+      {/* Title Input */}
+      <div className="px-4 pt-4 pb-2 border-b border-border/10 shrink-0">
+        <input
+          type="text"
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+          onBlur={() => {
+            const trimmed = title.trim();
+            if (!trimmed) {
+              setTitle(task.title);
+              toast.error("O título da tarefa não pode ser vazio.");
+              return;
+            }
+            if (trimmed !== task.title) {
+              saveField({ title: trimmed });
+            }
+          }}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              e.currentTarget.blur();
+            }
+          }}
+          placeholder="Título da tarefa"
+          className="w-full text-base font-bold bg-transparent border-transparent hover:border-border/30 focus:border-primary/50 focus:ring-1 focus:ring-primary/50 rounded px-2 py-1 -ml-2 text-foreground focus:outline-none transition-all"
+        />
+      </div>
+
       {/* Metadata Section */}
       <div className="p-4 space-y-4 border-b border-border/30">
         {/* Status */}
@@ -272,41 +349,42 @@ export function TaskDetailPanel({ task, onClose }: TaskDetailPanelProps) {
             </div>
           )}
 
-          <div className="flex flex-col gap-0.5 max-h-32 overflow-y-auto">
-            {subtasks.map((sub) => (
-              <div
-                key={sub.id}
-                className="flex items-center gap-2 group py-0.5 px-1 rounded hover:bg-muted/30 transition-colors"
-              >
-                <button
-                  onClick={() => handleToggleSubtask(sub.id)}
-                  className={cn(
-                    "shrink-0 size-3.5 rounded border transition-all cursor-pointer",
-                    sub.completed
-                      ? "bg-primary border-primary"
-                      : "border-border/80 hover:border-primary/50"
-                  )}
+          <div className="flex flex-col gap-1.5 max-h-40 overflow-y-auto overflow-x-hidden pr-1">
+            <AnimatePresence initial={false} mode="popLayout">
+              {subtasks.map((sub) => (
+                <motion.div
+                  key={sub.id}
+                  layout
+                  initial={{ opacity: 0, height: 0, y: -8 }}
+                  animate={{ opacity: 1, height: "auto", y: 0 }}
+                  exit={{ opacity: 0, height: 0, y: 8 }}
+                  transition={{ type: "spring", stiffness: 500, damping: 30 }}
+                  className="flex items-center gap-2 group py-1.5 px-2 rounded-lg hover:bg-muted/30 transition-colors border border-transparent hover:border-border/20"
                 >
-                  {sub.completed && (
-                    <CheckCircle2 className="size-3.5 text-primary-foreground" />
-                  )}
-                </button>
-                <span
-                  className={cn(
-                    "text-xs flex-1 transition-all",
-                    sub.completed && "line-through text-muted-foreground"
-                  )}
-                >
-                  {sub.title}
-                </span>
-                <button
-                  onClick={() => handleDeleteSubtask(sub.id)}
-                  className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-destructive transition-all cursor-pointer"
-                >
-                  <Trash2 className="size-3" />
-                </button>
-              </div>
-            ))}
+                  <AnimatedCheckbox
+                    checked={sub.completed}
+                    onChange={() => handleToggleSubtask(sub.id)}
+                  />
+                  <div className="relative flex-1 text-xs select-none">
+                    <span className={cn("transition-colors duration-300 font-medium", sub.completed ? "text-muted-foreground" : "text-foreground")}>
+                      {sub.title}
+                    </span>
+                    <motion.div
+                      initial={false}
+                      animate={{ width: sub.completed ? "100%" : "0%" }}
+                      transition={{ type: "spring", stiffness: 350, damping: 25 }}
+                      className="absolute left-0 top-1/2 -translate-y-1/2 h-[1px] bg-muted-foreground/60 origin-left"
+                    />
+                  </div>
+                  <button
+                    onClick={() => handleDeleteSubtask(sub.id)}
+                    className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-destructive transition-all cursor-pointer p-1 rounded hover:bg-muted"
+                  >
+                    <Trash2 className="size-3.5" />
+                  </button>
+                </motion.div>
+              ))}
+            </AnimatePresence>
           </div>
 
           <div className="flex items-center gap-1.5">
@@ -316,14 +394,14 @@ export function TaskDetailPanel({ task, onClose }: TaskDetailPanelProps) {
               onChange={(e) => setNewSubtaskTitle(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && handleAddSubtask()}
               placeholder="Nova subtask..."
-              className="flex-1 h-7 px-2 rounded border border-border/50 bg-muted/20 text-xs placeholder:text-muted-foreground/50 focus:outline-none focus:ring-1 focus:ring-primary/50 transition-all"
+              className="flex-1 h-8 px-2.5 rounded-lg border border-border/50 bg-muted/20 text-xs placeholder:text-muted-foreground/50 focus:outline-none focus:ring-1 focus:ring-primary/50 transition-all text-foreground"
             />
             <button
               onClick={handleAddSubtask}
               disabled={!newSubtaskTitle.trim()}
-              className="shrink-0 size-7 flex items-center justify-center rounded border border-border/50 text-muted-foreground hover:text-primary hover:border-primary/50 transition-all cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
+              className="shrink-0 size-8 flex items-center justify-center rounded-lg border border-border/50 text-muted-foreground hover:text-primary hover:border-primary/50 transition-all cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed bg-muted/10 hover:bg-muted/30"
             >
-              <Plus className="size-3.5" />
+              <Plus className="size-4" />
             </button>
           </div>
         </div>
@@ -372,14 +450,7 @@ export function TaskDetailPanel({ task, onClose }: TaskDetailPanelProps) {
           className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border/50 text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-muted/30 transition-all cursor-pointer"
         >
           <RotateCcw className="size-3.5" />
-          Voltar p/ Nota
-        </button>
-        <div className="flex-1" />
-        <button
-          onClick={onClose}
-          className="flex items-center gap-1.5 px-4 py-1.5 rounded-lg bg-primary text-primary-foreground text-xs font-semibold hover:bg-primary/90 transition-all cursor-pointer"
-        >
-          Fechar
+          Transformar em Nota
         </button>
       </div>
     </div>

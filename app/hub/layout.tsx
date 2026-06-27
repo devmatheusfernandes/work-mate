@@ -12,7 +12,7 @@ export default async function HubLayout({ children }: { children: React.ReactNod
       <UserStoreInitializer user={user} />
       <Sidebar />
       <main className="flex-1 flex flex-col min-w-0 relative overflow-hidden lg:p-2 md:p-0 p-0">
-        <div className="content-layout rounded-none lg:rounded-md w-full h-full overflow-y-auto">
+        <div className="content-layout rounded-none lg:rounded-xl w-full h-full overflow-y-auto">
           {children}
         </div>
       </main>

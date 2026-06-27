@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useMemo, useCallback } from "react";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Note, TaskStatus } from "@/modules/notes/notes.schema";
 import { Header } from "@/components/layout/header";
 import {
@@ -12,13 +12,15 @@ import {
   ChevronDown,
   Calendar,
   X,
+  Plus,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
-import { updateNoteAction } from "@/modules/notes/notes.actions";
+import { createNoteAction, updateNoteAction } from "@/modules/notes/notes.actions";
 import { useDevice } from "@/hooks/ui/use-device";
 import { TaskDetailPanel } from "./task-detail-panel";
+import { TaskDetailsVault } from "@/app/hub/notes/_components/task-details-vault";
 
 const COLUMNS: {
   status: TaskStatus;
@@ -169,6 +171,7 @@ function KanbanCard({
 }
 
 export function KanbanBoard({ tasks }: { tasks: Note[] }) {
+  const router = useRouter();
   const searchParams = useSearchParams();
   const taskIdParam = searchParams.get("taskId");
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(taskIdParam);
@@ -179,12 +182,48 @@ export function KanbanBoard({ tasks }: { tasks: Note[] }) {
   const effectiveSelectedTaskId = taskIdParam ?? selectedTaskId;
   const setEffectiveSelectedTaskId = useCallback((id: string | null) => {
     setSelectedTaskId(id);
-  }, []);
+    const params = new URLSearchParams(window.location.search);
+    if (id) {
+      params.set("taskId", id);
+    } else {
+      params.delete("taskId");
+    }
+    router.replace(`/hub/tasks?${params.toString()}`);
+  }, [router]);
 
   const selectedTask = useMemo(
     () => tasks.find((t) => t.id === effectiveSelectedTaskId) ?? null,
     [tasks, effectiveSelectedTaskId],
   );
+
+  const handleCreateTask = useCallback(async (status: TaskStatus) => {
+    const toastId = toast.loading("Criando nova tarefa...");
+    try {
+      const res = await createNoteAction({
+        title: "Nova Tarefa",
+        type: "task",
+        taskStatus: status,
+      });
+
+      if (res?.data?.success && res.data.note) {
+        toast.success("Tarefa criada com sucesso!", { id: toastId });
+        setEffectiveSelectedTaskId(res.data.note.id);
+      } else {
+        toast.error(res?.serverError || "Erro ao criar tarefa.", { id: toastId });
+      }
+    } catch (err) {
+      console.error(err);
+      toast.error("Erro ao criar tarefa.", { id: toastId });
+    }
+  }, [setEffectiveSelectedTaskId]);
+
+  const headerActions = useMemo(() => [
+    {
+      label: "Nova Tarefa",
+      icon: <Plus className="size-4" />,
+      onClick: () => handleCreateTask("to_start"),
+    }
+  ], [handleCreateTask]);
 
   const tasksByStatus = useMemo(() => {
     const map: Record<TaskStatus, Note[]> = {
@@ -266,6 +305,7 @@ export function KanbanBoard({ tasks }: { tasks: Note[] }) {
         showSidebarTrigger
         showSubHeader={false}
         className="contents"
+        actions={headerActions}
       />
 
       <main className="flex-1 flex overflow-hidden">
@@ -337,6 +377,14 @@ export function KanbanBoard({ tasks }: { tasks: Note[] }) {
                       />
                     ))
                   )}
+
+                  <button
+                    onClick={() => handleCreateTask(col.status)}
+                    className="flex items-center justify-center gap-1.5 w-full py-2 border border-dashed border-border/20 hover:border-primary/30 rounded-lg text-xs text-muted-foreground hover:text-primary transition-all duration-200 cursor-pointer mt-1"
+                  >
+                    <Plus className="size-3.5" />
+                    <span>Adicionar tarefa</span>
+                  </button>
                 </div>
               </div>
             );
@@ -357,8 +405,8 @@ export function KanbanBoard({ tasks }: { tasks: Note[] }) {
                 <div className="h-full flex flex-col">
                   {/* Panel Header */}
                   <div className="flex items-center justify-between px-4 h-12 border-b border-border/30 shrink-0">
-                    <h2 className="text-sm font-bold tracking-tight text-foreground truncate pr-4">
-                      {selectedTask.title}
+                    <h2 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                      Detalhes da Tarefa
                     </h2>
                     <button
                       onClick={() => setEffectiveSelectedTaskId(null)}
@@ -380,6 +428,19 @@ export function KanbanBoard({ tasks }: { tasks: Note[] }) {
               </motion.div>
             )}
           </AnimatePresence>
+        )}
+
+        {/* Task Details Vault (Mobile) */}
+        {isMobile && selectedTask && (
+          <TaskDetailsVault
+            task={selectedTask}
+            open={isPanelOpen}
+            onOpenChange={(open) => {
+              if (!open) {
+                setEffectiveSelectedTaskId(null);
+              }
+            }}
+          />
         )}
       </main>
     </div>

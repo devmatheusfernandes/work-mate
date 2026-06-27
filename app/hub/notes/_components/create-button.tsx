@@ -34,6 +34,7 @@ import { saveOfflineItem, deleteOfflineItem } from "@/lib/offline-db";
 interface CreateButtonProps {
   activeFolderId: string | null;
   tags: Tag[];
+  defaultType?: "note" | "task";
   isTasksSidebarOpen?: boolean;
   isTasksSidebarExpanded?: boolean;
   onOpenTasksSidebar?: () => void;
@@ -155,6 +156,7 @@ const itemVariants = {
 export function CreateButton({ 
   activeFolderId, 
   tags, 
+  defaultType = "note",
   isTasksSidebarOpen = false, 
   isTasksSidebarExpanded = false,
   onOpenTasksSidebar,
@@ -784,10 +786,14 @@ export function CreateButton({
       if (isOpenMenu) {
         setIsOpenMenu(false);
       } else {
-        handleCreateNote();
+        if (defaultType === "task") {
+          handleCreateTask();
+        } else {
+          handleCreateNote();
+        }
       }
     }
-  }, [cancelPress, isMenuBusy, isOpenMenu, handleCreateNote]);
+  }, [cancelPress, isMenuBusy, isOpenMenu, defaultType, handleCreateTask, handleCreateNote]);
 
   return (
     <>
