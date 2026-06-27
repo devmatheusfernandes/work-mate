@@ -3,21 +3,17 @@
 import { useEffect, useRef, useState } from "react";
 import { SimpleEditor } from "@/components/tiptap-templates/simple/simple-editor";
 import { updateNoteAction } from "@/modules/notes/notes.actions";
-import { Note, Tag } from "@/modules/notes/notes.schema";
-import { NoteTagManager } from "./note-tag-manager";
+import { Note } from "@/modules/notes/notes.schema";
 import { Loader2, CheckCircle2, AlertCircle } from "lucide-react";
 import { saveOfflineItem } from "@/lib/offline-db";
 import {
   Vault,
   VaultContent,
-  VaultHeader,
-  VaultTitle,
   VaultBody,
 } from "@/components/ui/vault";
 
 interface NoteDetailsVaultProps {
   note: Note | null;
-  tags?: Tag[];
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onNoteUpdated?: (note: Note) => void;
@@ -25,26 +21,64 @@ interface NoteDetailsVaultProps {
 
 export function NoteDetailsVault({
   note,
-  tags = [],
   open,
   onOpenChange,
   onNoteUpdated,
 }: NoteDetailsVaultProps) {
   const [saveStatus, setSaveStatus] = useState<"saved" | "saving" | "error" | "saved_offline">("saved");
-  const [noteTitle, setNoteTitle] = useState("");
-  const [noteContent, setNoteContent] = useState("");
+  const [noteTitle, setNoteTitle] = useState(note ? note.title : "");
+  const [noteContent, setNoteContent] = useState(note ? note.content || "" : "");
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  const [localTagIds, setLocalTagIds] = useState<string[]>([]);
-  const [prevNote, setPrevNote] = useState<Note | null>(null);
+  const [localTagIds, setLocalTagIds] = useState<string[]>(note ? note.tagIds || [] : []);
+  const [prevNoteId, setPrevNoteId] = useState<string | null>(note ? note.id : null);
+  const prevNoteIdRef = useRef<string | null>(note ? note.id : null);
 
-  if (note !== prevNote) {
-    setPrevNote(note);
-    setNoteTitle(note ? note.title : "");
-    setNoteContent(note ? note.content || "" : "");
-    setLocalTagIds(note ? note.tagIds : []);
-    setSaveStatus("saved");
+  if (note && note.id !== prevNoteId) {
+    const isIdSwap = prevNoteId && prevNoteId.startsWith("temp_") && !note.id.startsWith("temp_");
+    setPrevNoteId(note.id);
+    if (!isIdSwap) {
+      setNoteTitle(note.title);
+      setNoteContent(note.content || "");
+      setLocalTagIds(note.tagIds || []);
+      setSaveStatus("saved");
+    } else {
+      const hasEdits = noteTitle !== note.title || 
+                       noteContent !== (note.content || "") || 
+                       JSON.stringify(localTagIds) !== JSON.stringify(note.tagIds);
+      setSaveStatus(hasEdits ? "saving" : "saved");
+    }
   }
+
+  useEffect(() => {
+    if (!note) return;
+
+    const wasTemp = prevNoteIdRef.current && prevNoteIdRef.current.startsWith("temp_");
+    const isReal = !note.id.startsWith("temp_");
+    
+    if (wasTemp && isReal && note.id !== prevNoteIdRef.current) {
+      const currentEdits: Partial<Note> = {};
+      if (noteTitle !== note.title) currentEdits.title = noteTitle;
+      if (noteContent !== (note.content || "")) currentEdits.content = noteContent;
+      if (JSON.stringify(localTagIds) !== JSON.stringify(note.tagIds)) currentEdits.tagIds = localTagIds;
+      
+      if (Object.keys(currentEdits).length > 0) {
+        updateNoteAction({ id: note.id, updates: currentEdits }).then((res) => {
+          if (res?.data?.success) {
+            setSaveStatus("saved");
+            const updatedNote = { ...note, ...currentEdits } as Note;
+            saveOfflineItem("notes", updatedNote);
+            onNoteUpdated?.(updatedNote);
+          } else {
+            setSaveStatus("error");
+          }
+        }).catch(() => {
+          setSaveStatus("error");
+        });
+      }
+    }
+    prevNoteIdRef.current = note.id;
+  }, [note, noteTitle, noteContent, localTagIds, onNoteUpdated]);
 
   useEffect(() => {
     return () => {
@@ -61,6 +95,10 @@ export function NoteDetailsVault({
 
     if (saveTimeoutRef.current) {
       clearTimeout(saveTimeoutRef.current);
+    }
+
+    if (note.id.startsWith("temp_")) {
+      return; // Hold edits in local state
     }
 
     saveTimeoutRef.current = setTimeout(async () => {
@@ -111,31 +149,16 @@ export function NoteDetailsVault({
   };
 
   return (
-    <Vault open={open} onOpenChange={onOpenChange}>
-      <VaultContent className="max-w-4xl h-[90vh] md:h-[85vh] p-0" aria-label="Editar Nota">
-        <VaultHeader className="sr-only">
-          <VaultTitle>Editar Nota</VaultTitle>
-        </VaultHeader>
+    <Vault open={open} onOpenChange={onOpenChange} >
+      <VaultContent showHandle={false} noPadding className="max-w-4xl h-[90vh] md:h-[85vh] overflow-hidden" aria-label="Editar Nota">
         <VaultBody className="p-0 h-full overflow-hidden relative">
-          <div className="w-full h-full pt-4 pb-12 overflow-y-auto">
+          <div className="w-full h-full overflow-y-auto">
             <SimpleEditor
               title={noteTitle}
               content={noteContent}
               onChange={handleContentChange}
               onTitleChange={handleTitleChange}
-            >
-              <NoteTagManager
-                noteTagIds={localTagIds}
-                allTags={tags}
-                onToggleTag={(tagId) => {
-                  const nextTagIds = localTagIds.includes(tagId)
-                    ? localTagIds.filter((id) => id !== tagId)
-                    : [...localTagIds, tagId];
-                  setLocalTagIds(nextTagIds);
-                  triggerSave({ tagIds: nextTagIds });
-                }}
-              />
-            </SimpleEditor>
+            />
           </div>
 
           {/* Synchronization status indicator */}

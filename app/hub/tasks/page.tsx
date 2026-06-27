@@ -1,7 +1,6 @@
 import { notesService } from "@/modules/notes/notes.service";
 import { getCurrentUser } from "@/lib/safe-action";
 import { KanbanBoard } from "./_components/kanban-board";
-import { CreateButton } from "../notes/_components/create-button";
 import { redirect } from "next/navigation";
 import { Suspense } from "react";
 
@@ -17,8 +16,7 @@ export default async function TasksPage() {
 
   return (
     <Suspense fallback={<div className="flex h-full items-center justify-center p-8 text-sm text-muted-foreground">Carregando tarefas...</div>}>
-      <KanbanBoard tasks={tasks} />
-      <CreateButton activeFolderId={null} tags={tags} defaultType="task" />
+      <KanbanBoard tasks={tasks} tags={tags} />
     </Suspense>
   );
 }

@@ -14,7 +14,7 @@ import { TasksSidebar } from "./tasks-sidebar";
 import { Empty, EmptyHeader, EmptyMedia, EmptyTitle, EmptyDescription, EmptyResults } from "@/components/ui/empty";
 import { FileText, KanbanSquare } from "lucide-react";
 import { toast } from "sonner";
-import { updateNoteAction, updateFolderAction, embedMultipleNotesNowAction } from "@/modules/notes/notes.actions";
+import { createNoteAction, updateNoteAction, updateFolderAction, embedMultipleNotesNowAction } from "@/modules/notes/notes.actions";
 import { useDevice } from "@/hooks/ui/use-device";
 import { SearchBar } from "@/components/ui/search-bar";
 import { saveOfflineItem, getAllOfflineItems, saveOfflineItemsBatch } from "@/lib/offline-db";
@@ -125,6 +125,58 @@ export function NotesDashboard({
     },
     [localNotes]
   );
+
+  const handleCreateNote = useCallback(async () => {
+    const tempId = `temp_note_${Date.now()}`;
+    const tempNote: Note = {
+      userId: "local",
+      id: tempId,
+      title: "Nova Nota",
+      folderId: activeFolderId,
+      type: "note",
+      content: "",
+      searchText: "",
+      tagIds: [] as string[],
+      archived: false,
+      trashed: false,
+      pinned: false,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      isLocked: false,
+      taskStatus: null,
+      taskDeadline: null,
+      taskSubtasks: [],
+      taskShouldNotify: false,
+    };
+
+    setLocalNotes((curr) => [tempNote, ...curr]);
+    setEditingNote(tempNote);
+    setNoteVaultOpen(true);
+
+    try {
+      const res = await createNoteAction({
+        title: "Nova Nota",
+        folderId: activeFolderId,
+        type: "note",
+      });
+
+      if (res?.data?.success && res.data.note) {
+        setLocalNotes((curr) => curr.map((n) => (n.id === tempId ? res.data.note! : n)));
+        setEditingNote(res.data.note);
+      } else {
+        setLocalNotes((curr) => curr.filter((n) => n.id !== tempId));
+        setEditingNote(null);
+        setNoteVaultOpen(false);
+        toast.error(res?.serverError || "Erro ao criar nota.");
+      }
+    } catch (err) {
+      console.error(err);
+      setLocalNotes((curr) => curr.filter((n) => n.id !== tempId));
+      setEditingNote(null);
+      setNoteVaultOpen(false);
+      toast.error("Erro ao criar nota.");
+    }
+  }, [activeFolderId]);
 
   // Derive current folder details
   const currentFolder = useMemo(() => {
@@ -776,6 +828,7 @@ export function NotesDashboard({
         <CreateButton 
           activeFolderId={activeFolderId} 
           tags={localTags} 
+          onCreateNote={handleCreateNote}
           isTasksSidebarOpen={sidebarOpen}
           isTasksSidebarExpanded={tasksSidebarExpanded}
           onOpenTasksSidebar={() => setSidebarOpen(true)}
@@ -798,7 +851,6 @@ export function NotesDashboard({
         />
         <NoteDetailsVault
           note={editingNote}
-          tags={localTags}
           open={noteVaultOpen}
           onOpenChange={setNoteVaultOpen}
           onNoteUpdated={(updatedNote) => {

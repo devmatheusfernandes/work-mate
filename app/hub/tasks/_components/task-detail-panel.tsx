@@ -104,18 +104,41 @@ export function TaskDetailPanel({ task, onClose }: TaskDetailPanelProps) {
   const [shouldNotify, setShouldNotify] = useState(task.taskShouldNotify || false);
   const [newSubtaskTitle, setNewSubtaskTitle] = useState("");
   const [title, setTitle] = useState(task.title);
-  const [prevTaskTitle, setPrevTaskTitle] = useState(task.title);
-
-  if (task.title !== prevTaskTitle) {
-    setTitle(task.title);
-    setPrevTaskTitle(task.title);
-  }
+  
+  const prevTaskIdRef = useRef<string>(task.id);
   const contentRef = useRef<string>(
     typeof task.content === "string" ? task.content : ""
   );
+
+  useEffect(() => {
+    const wasTemp = prevTaskIdRef.current.startsWith("temp_");
+    const isReal = !task.id.startsWith("temp_");
+    
+    if (wasTemp && isReal && task.id !== prevTaskIdRef.current) {
+      // Swapped temp -> real. Sync local edits to server in background.
+      const currentEdits: Partial<Note> = {};
+      if (title !== task.title) currentEdits.title = title;
+      if (status !== task.taskStatus) currentEdits.taskStatus = status;
+      if (deadline !== task.taskDeadline) currentEdits.taskDeadline = deadline;
+      if (JSON.stringify(subtasks) !== JSON.stringify(task.taskSubtasks)) currentEdits.taskSubtasks = subtasks;
+      if (shouldNotify !== task.taskShouldNotify) currentEdits.taskShouldNotify = shouldNotify;
+      if (contentRef.current !== (task.content || "")) {
+        currentEdits.content = contentRef.current;
+        currentEdits.searchText = contentRef.current.replace(/<[^>]*>/g, " ").trim();
+      }
+      
+      if (Object.keys(currentEdits).length > 0) {
+        updateNoteAction({ id: task.id, updates: currentEdits }).catch(console.error);
+      }
+    }
+    prevTaskIdRef.current = task.id;
+  }, [task, title, status, deadline, subtasks, shouldNotify]);
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const saveField = useCallback(async (updates: Partial<Note>) => {
+    if (task.id.startsWith("temp_")) {
+      return; // Hold edits in local state
+    }
     try {
       await updateNoteAction({
         id: task.id,
@@ -129,6 +152,9 @@ export function TaskDetailPanel({ task, onClose }: TaskDetailPanelProps) {
   const triggerDebouncedSave = useCallback((updates: Partial<Note>) => {
     if (saveTimeoutRef.current) {
       clearTimeout(saveTimeoutRef.current);
+    }
+    if (task.id.startsWith("temp_")) {
+      return; // Hold edits in local state
     }
     saveTimeoutRef.current = setTimeout(async () => {
       try {

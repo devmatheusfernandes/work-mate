@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
 import { updateNoteAction } from "@/modules/notes/notes.actions";
@@ -113,17 +113,35 @@ export function TaskDetailsVault({
   const [newSubtaskTitle, setNewSubtaskTitle] = useState("");
   const [isConverting, setIsConverting] = useState(false);
   const [title, setTitle] = useState(task.title);
-  const [prevTaskTitle, setPrevTaskTitle] = useState(task.title);
+  
+  const prevTaskIdRef = useRef<string>(task.id);
 
-  if (task.title !== prevTaskTitle) {
-    setTitle(task.title);
-    setPrevTaskTitle(task.title);
-  }
+  useEffect(() => {
+    const wasTemp = prevTaskIdRef.current.startsWith("temp_");
+    const isReal = !task.id.startsWith("temp_");
+
+    if (wasTemp && isReal && task.id !== prevTaskIdRef.current) {
+      const currentEdits: Partial<Note> = {};
+      if (title !== task.title) currentEdits.title = title;
+      if (status !== task.taskStatus) currentEdits.taskStatus = status;
+      if (deadline !== task.taskDeadline) currentEdits.taskDeadline = deadline;
+      if (JSON.stringify(subtasks) !== JSON.stringify(task.taskSubtasks)) currentEdits.taskSubtasks = subtasks;
+      if (shouldNotify !== task.taskShouldNotify) currentEdits.taskShouldNotify = shouldNotify;
+
+      if (Object.keys(currentEdits).length > 0) {
+        updateNoteAction({ id: task.id, updates: currentEdits }).catch(console.error);
+      }
+    }
+    prevTaskIdRef.current = task.id;
+  }, [task, title, status, deadline, subtasks, shouldNotify]);
 
   const completedCount = subtasks.filter((s) => s.completed).length;
   const progress = subtasks.length > 0 ? (completedCount / subtasks.length) * 100 : 0;
 
   const saveField = useCallback(async (updates: Partial<Note>, rollbackFn?: () => void) => {
+    if (task.id.startsWith("temp_")) {
+      return; // Hold edits in local state
+    }
     try {
       const result = await updateNoteAction({
         id: task.id,

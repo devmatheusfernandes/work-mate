@@ -21,6 +21,8 @@ import { createNoteAction, updateNoteAction } from "@/modules/notes/notes.action
 import { useDevice } from "@/hooks/ui/use-device";
 import { TaskDetailPanel } from "./task-detail-panel";
 import { TaskDetailsVault } from "@/app/hub/notes/_components/task-details-vault";
+import { CreateButton } from "@/app/hub/notes/_components/create-button";
+import { Tag } from "@/modules/notes/notes.schema";
 
 const COLUMNS: {
   status: TaskStatus;
@@ -170,13 +172,22 @@ function KanbanCard({
   );
 }
 
-export function KanbanBoard({ tasks }: { tasks: Note[] }) {
+export function KanbanBoard({ tasks, tags }: { tasks: Note[]; tags: Tag[] }) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const taskIdParam = searchParams.get("taskId");
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(taskIdParam);
+  const [activeSelectionKey, setActiveSelectionKey] = useState<string | null>(taskIdParam);
   const [dragOverColumn, setDragOverColumn] = useState<TaskStatus | null>(null);
   const { isMobile } = useDevice();
+
+  const [localTasks, setLocalTasks] = useState(tasks);
+  const [prevTasks, setPrevTasks] = useState(tasks);
+
+  if (tasks !== prevTasks) {
+    setLocalTasks(tasks);
+    setPrevTasks(tasks);
+  }
 
   // Sync selectedTaskId when taskIdParam (search param) changes without cascading setState in an effect
   const effectiveSelectedTaskId = taskIdParam ?? selectedTaskId;
@@ -185,45 +196,23 @@ export function KanbanBoard({ tasks }: { tasks: Note[] }) {
     const params = new URLSearchParams(window.location.search);
     if (id) {
       params.set("taskId", id);
+      setActiveSelectionKey((prev) => {
+        if (prev && prev.startsWith("temp_") && id && !id.startsWith("temp_")) {
+          return prev;
+        }
+        return id;
+      });
     } else {
       params.delete("taskId");
+      setActiveSelectionKey(null);
     }
     router.replace(`/hub/tasks?${params.toString()}`);
   }, [router]);
 
   const selectedTask = useMemo(
-    () => tasks.find((t) => t.id === effectiveSelectedTaskId) ?? null,
-    [tasks, effectiveSelectedTaskId],
+    () => localTasks.find((t) => t.id === effectiveSelectedTaskId) ?? null,
+    [localTasks, effectiveSelectedTaskId],
   );
-
-  const handleCreateTask = useCallback(async (status: TaskStatus) => {
-    const toastId = toast.loading("Criando nova tarefa...");
-    try {
-      const res = await createNoteAction({
-        title: "Nova Tarefa",
-        type: "task",
-        taskStatus: status,
-      });
-
-      if (res?.data?.success && res.data.note) {
-        toast.success("Tarefa criada com sucesso!", { id: toastId });
-        setEffectiveSelectedTaskId(res.data.note.id);
-      } else {
-        toast.error(res?.serverError || "Erro ao criar tarefa.", { id: toastId });
-      }
-    } catch (err) {
-      console.error(err);
-      toast.error("Erro ao criar tarefa.", { id: toastId });
-    }
-  }, [setEffectiveSelectedTaskId]);
-
-  const headerActions = useMemo(() => [
-    {
-      label: "Nova Tarefa",
-      icon: <Plus className="size-4" />,
-      onClick: () => handleCreateTask("to_start"),
-    }
-  ], [handleCreateTask]);
 
   const tasksByStatus = useMemo(() => {
     const map: Record<TaskStatus, Note[]> = {
@@ -231,12 +220,12 @@ export function KanbanBoard({ tasks }: { tasks: Note[] }) {
       in_progress: [],
       done: [],
     };
-    for (const task of tasks) {
+    for (const task of localTasks) {
       const status = (task.taskStatus || "to_start") as TaskStatus;
       map[status].push(task);
     }
     return map;
-  }, [tasks]);
+  }, [localTasks]);
 
   const handleDrop = async (e: React.DragEvent, targetStatus: TaskStatus) => {
     e.preventDefault();
@@ -248,27 +237,31 @@ export function KanbanBoard({ tasks }: { tasks: Note[] }) {
     const [type, id] = data.split(":");
     if (type !== "task" || !id) return;
 
-    const existingTask = tasks.find((t) => t.id === id);
+    const existingTask = localTasks.find((t) => t.id === id);
     if (existingTask && existingTask.taskStatus === targetStatus) return;
 
-    const toastId = toast.loading("Movendo tarefa...");
+    const prev = [...localTasks];
+    setLocalTasks((current) =>
+      current.map((t) => (t.id === id ? { ...t, taskStatus: targetStatus } : t))
+    );
+
     try {
       const result = await updateNoteAction({
         id,
         updates: { taskStatus: targetStatus },
       });
-      if (result?.data?.success) {
-        toast.success("Tarefa movida!", { id: toastId });
-      } else {
-        toast.error("Erro ao mover tarefa.", { id: toastId });
+      if (!result?.data?.success) {
+        setLocalTasks(prev);
+        toast.error("Erro ao mover tarefa.");
       }
     } catch {
-      toast.error("Erro ao mover tarefa.", { id: toastId });
+      setLocalTasks(prev);
+      toast.error("Erro ao mover tarefa.");
     }
   };
 
   const handleMoveStatus = async (taskId: string, direction: "up" | "down") => {
-    const task = tasks.find((t) => t.id === taskId);
+    const task = localTasks.find((t) => t.id === taskId);
     if (!task) return;
 
     const currentIndex = STATUS_ORDER.indexOf(
@@ -279,22 +272,82 @@ export function KanbanBoard({ tasks }: { tasks: Note[] }) {
     if (newIndex < 0 || newIndex >= STATUS_ORDER.length) return;
 
     const newStatus = STATUS_ORDER[newIndex];
-    const toastId = toast.loading("Movendo tarefa...");
+    const prev = [...localTasks];
+    setLocalTasks((current) =>
+      current.map((t) => (t.id === taskId ? { ...t, taskStatus: newStatus } : t))
+    );
 
     try {
       const result = await updateNoteAction({
         id: taskId,
         updates: { taskStatus: newStatus },
       });
-      if (result?.data?.success) {
-        toast.success("Tarefa movida!", { id: toastId });
-      } else {
-        toast.error("Erro ao mover tarefa.", { id: toastId });
+      if (!result?.data?.success) {
+        setLocalTasks(prev);
+        toast.error("Erro ao mover tarefa.");
       }
     } catch {
-      toast.error("Erro ao mover tarefa.", { id: toastId });
+      setLocalTasks(prev);
+      toast.error("Erro ao mover tarefa.");
     }
   };
+
+  const handleCreateTask = useCallback(async (status: TaskStatus) => {
+    const tempId = `temp_task_${Date.now()}`;
+    const tempTask: Note = {
+      userId: "local",
+      id: tempId,
+      title: "Nova Tarefa",
+      folderId: null,
+      type: "task",
+      content: "",
+      searchText: "",
+      tagIds: [] as string[],
+      archived: false,
+      trashed: false,
+      pinned: false,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      isLocked: false,
+      taskStatus: status,
+      taskDeadline: null,
+      taskSubtasks: [],
+      taskShouldNotify: false,
+    };
+
+    setLocalTasks((curr) => [...curr, tempTask]);
+    setEffectiveSelectedTaskId(tempId);
+
+    try {
+      const res = await createNoteAction({
+        title: "Nova Tarefa",
+        type: "task",
+        taskStatus: status,
+      });
+
+      if (res?.data?.success && res.data.note) {
+        setLocalTasks((curr) => curr.map((t) => (t.id === tempId ? res.data.note! : t)));
+        setEffectiveSelectedTaskId(res.data.note.id);
+      } else {
+        setLocalTasks((curr) => curr.filter((t) => t.id !== tempId));
+        setEffectiveSelectedTaskId(null);
+        toast.error(res?.serverError || "Erro ao criar tarefa.");
+      }
+    } catch (err) {
+      console.error(err);
+      setLocalTasks((curr) => curr.filter((t) => t.id !== tempId));
+      setEffectiveSelectedTaskId(null);
+      toast.error("Erro ao criar tarefa.");
+    }
+  }, [setEffectiveSelectedTaskId]);
+
+  const headerActions = useMemo(() => [
+    {
+      label: "Nova Tarefa",
+      icon: <Plus className="size-4" />,
+      onClick: () => handleCreateTask("to_start"),
+    }
+  ], [handleCreateTask]);
 
   const isPanelOpen = !!selectedTask;
 
@@ -419,7 +472,7 @@ export function KanbanBoard({ tasks }: { tasks: Note[] }) {
                   {/* Panel Content */}
                   <div className="flex-1 overflow-y-auto">
                     <TaskDetailPanel
-                      key={selectedTask.id}
+                      key={activeSelectionKey}
                       task={selectedTask}
                       onClose={() => setEffectiveSelectedTaskId(null)}
                     />
@@ -443,6 +496,13 @@ export function KanbanBoard({ tasks }: { tasks: Note[] }) {
           />
         )}
       </main>
+
+      <CreateButton
+        activeFolderId={null}
+        tags={tags}
+        defaultType="task"
+        onCreateTask={handleCreateTask}
+      />
     </div>
   );
 }

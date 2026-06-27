@@ -28,13 +28,15 @@ import {
   VaultField,
   VaultInput,
 } from "@/components/ui/vault";
-import { Note, Folder, Tag } from "@/modules/notes/notes.schema";
+import { Note, Folder, Tag, TaskStatus } from "@/modules/notes/notes.schema";
 import { saveOfflineItem, deleteOfflineItem } from "@/lib/offline-db";
 
 interface CreateButtonProps {
   activeFolderId: string | null;
   tags: Tag[];
   defaultType?: "note" | "task";
+  onCreateNote?: () => void;
+  onCreateTask?: (status: TaskStatus) => void;
   isTasksSidebarOpen?: boolean;
   isTasksSidebarExpanded?: boolean;
   onOpenTasksSidebar?: () => void;
@@ -157,6 +159,8 @@ export function CreateButton({
   activeFolderId, 
   tags, 
   defaultType = "note",
+  onCreateNote,
+  onCreateTask,
   isTasksSidebarOpen = false, 
   isTasksSidebarExpanded = false,
   onOpenTasksSidebar,
@@ -216,6 +220,10 @@ export function CreateButton({
 
   // --- Action handlers (Declared first so they are available in Pointer Handlers) ---
   const handleCreateNote = useCallback(async () => {
+    if (onCreateNote) {
+      onCreateNote();
+      return;
+    }
     setIsCreatingNote(true);
     setIsOpenMenu(false);
 
@@ -304,9 +312,13 @@ export function CreateButton({
     } finally {
       setIsCreatingNote(false);
     }
-  }, [activeFolderId, router, onNoteCreatedOffline]);
+  }, [activeFolderId, router, onNoteCreatedOffline, onCreateNote]);
 
   const handleCreateTask = useCallback(async () => {
+    if (onCreateTask) {
+      onCreateTask("to_start");
+      return;
+    }
     setIsCreatingTask(true);
     setIsOpenMenu(false);
 
@@ -401,7 +413,7 @@ export function CreateButton({
     } finally {
       setIsCreatingTask(false);
     }
-  }, [activeFolderId, router, onNoteCreatedOffline]);
+  }, [activeFolderId, router, onNoteCreatedOffline, onCreateTask]);
 
   const handleCreateFolder = useCallback(async (e?: React.FormEvent) => {
     e?.preventDefault();
