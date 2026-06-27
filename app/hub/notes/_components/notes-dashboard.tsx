@@ -1,7 +1,8 @@
 "use client";
 
-import { useMemo, useState, useCallback, useEffect } from "react";
+import { useMemo, useState, useCallback, useEffect, Fragment } from "react";
 import { motion } from "framer-motion";
+import Link from "next/link";
 import { Folder, Note, Tag } from "@/modules/notes/notes.schema";
 import { Header, type HeaderAction } from "@/components/layout/header";
 import { TagChips } from "./tag-chips";
@@ -18,6 +19,7 @@ import { useDevice } from "@/hooks/ui/use-device";
 import { SearchBar } from "@/components/ui/search-bar";
 import { saveOfflineItem, getAllOfflineItems, saveOfflineItemsBatch } from "@/lib/offline-db";
 import { NoteDetailsVault } from "./note-details-vault";
+import { cn } from "@/lib/utils";
 
 interface NotesDashboardProps {
   notes: Note[];
@@ -37,6 +39,7 @@ export function NotesDashboard({
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [tasksSidebarExpanded, setTasksSidebarExpanded] = useState(false);
   const { isMobile } = useDevice();
+  const [activeTab, setActiveTab] = useState<"notes" | "folders" | "archive">("notes");
 
   const [localNotes, setLocalNotes] = useState(notes);
   const [localFolders, setLocalFolders] = useState(folders);
@@ -182,6 +185,50 @@ export function NotesDashboard({
         (n.searchText && n.searchText.toLowerCase().includes(q))
     );
   }, [tagFilteredNotes, searchQuery]);
+
+  // Archived items
+  const archivedFolders = useMemo(() => {
+    return localFolders.filter((f) => f.archived && !f.trashed);
+  }, [localFolders]);
+
+  const archivedNotes = useMemo(() => {
+    return localNotes.filter(
+      (n) => n.archived && !n.trashed && n.type !== "task"
+    );
+  }, [localNotes]);
+
+  const folderPath = useMemo(() => {
+    if (!activeFolderId) return [];
+    const path: Folder[] = [];
+    let current = localFolders.find((f) => f.id === activeFolderId);
+    while (current) {
+      path.unshift(current);
+      const parentId = current.parentId;
+      if (parentId) {
+        current = localFolders.find((f) => f.id === parentId);
+      } else {
+        break;
+      }
+    }
+    return path;
+  }, [localFolders, activeFolderId]);
+
+  // Filter archived by search query
+  const queryFilteredArchivedFolders = useMemo(() => {
+    if (!searchQuery.trim()) return archivedFolders;
+    const q = searchQuery.toLowerCase();
+    return archivedFolders.filter((f) => f.title.toLowerCase().includes(q));
+  }, [archivedFolders, searchQuery]);
+
+  const queryFilteredArchivedNotes = useMemo(() => {
+    if (!searchQuery.trim()) return archivedNotes;
+    const q = searchQuery.toLowerCase();
+    return archivedNotes.filter(
+      (n) =>
+        n.title.toLowerCase().includes(q) ||
+        (n.searchText && n.searchText.toLowerCase().includes(q))
+    );
+  }, [archivedNotes, searchQuery]);
 
   // Check if selection is active
   const isSelectionActive = selectedNoteIds.size > 0 || selectedFolderIds.size > 0;
@@ -379,8 +426,6 @@ export function NotesDashboard({
     );
   };
 
-  const hasItems = queryFilteredFolders.length > 0 || queryFilteredNotes.length > 0 || isDragOverGrid;
-
   // Header actions — mobile Kanban button
   const headerActions: HeaderAction[] = isMobile
     ? [
@@ -420,6 +465,74 @@ export function NotesDashboard({
             handleGridDrop(e);
           }}
         >
+          {/* Responsive Tab Bar (Notes : Folders on left, Archive on right) */}
+          <div className="flex items-center justify-between border-b border-border/10 pb-3 mb-2 px-1">
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => setActiveTab("notes")}
+                className={cn(
+                  "text-xl font-bold transition-all duration-200 cursor-pointer active:scale-95",
+                  activeTab === "notes" ? "text-foreground" : "text-muted-foreground/40"
+                )}
+              >
+                Notas
+              </button>
+              <span className="text-muted-foreground/30 font-light text-lg select-none">:</span>
+              <button
+                onClick={() => setActiveTab("folders")}
+                className={cn(
+                  "text-xl font-bold transition-all duration-200 cursor-pointer active:scale-95",
+                  activeTab === "folders" ? "text-foreground" : "text-muted-foreground/40"
+                )}
+              >
+                Pastas
+              </button>
+            </div>
+            <button
+              onClick={() => setActiveTab("archive")}
+              className={cn(
+                "text-sm font-semibold transition-all duration-200 cursor-pointer active:scale-95 px-3 py-1 rounded-full",
+                activeTab === "archive" 
+                  ? "text-primary bg-primary/10 border border-primary/20" 
+                  : "text-muted-foreground/40 hover:text-muted-foreground/60"
+              )}
+            >
+              Arquivadas
+            </button>
+          </div>
+
+          {/* Breadcrumb Navigation for recursive folder path (indicator + quick return links) */}
+          {activeFolderId && (
+            <nav className="flex items-center gap-1.5 text-xs text-muted-foreground/60 py-1.5 px-1 overflow-x-auto no-scrollbar scroll-smooth">
+              <Link
+                href="/hub/notes"
+                className="hover:text-foreground transition-colors font-medium flex items-center gap-1 shrink-0"
+              >
+                Notas
+              </Link>
+              {folderPath.map((folder, index) => {
+                const isLast = index === folderPath.length - 1;
+                return (
+                  <Fragment key={folder.id}>
+                    <span className="text-muted-foreground/30 font-light select-none">/</span>
+                    {isLast ? (
+                      <span className="font-bold text-foreground truncate max-w-[140px] shrink-0">
+                        {folder.title}
+                      </span>
+                    ) : (
+                      <Link
+                        href={`/hub/notes/folder/${folder.id}`}
+                        className="hover:text-foreground transition-colors font-medium truncate max-w-[110px] shrink-0"
+                      >
+                        {folder.title}
+                      </Link>
+                    )}
+                  </Fragment>
+                );
+              })}
+            </nav>
+          )}
+
           {/* Tags & Search Row */}
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 w-full">
             <div className="flex-1 min-w-0">
@@ -440,27 +553,11 @@ export function NotesDashboard({
 
           {/* Dashboard Content Grid */}
           <div className="flex flex-col gap-6">
-            {!hasItems ? (
-              searchQuery ? (
-                <EmptyResults searchQuery={searchQuery} />
-              ) : (
-                <Empty className="py-20 border-none bg-transparent">
-                  <EmptyHeader>
-                    <EmptyMedia variant="icon">
-                      <FileText className="size-6 text-muted-foreground" />
-                    </EmptyMedia>
-                    <EmptyTitle>Nada por aqui ainda</EmptyTitle>
-                    <EmptyDescription>
-                      Esta pasta está vazia. Toque no botão + no canto inferior direito para começar a organizar seus estudos.
-                    </EmptyDescription>
-                  </EmptyHeader>
-                </Empty>
-              )
-            ) : (
+            {activeTab === "notes" && (
               <>
-                {/* Folders Section */}
+                {/* Folders Section (Shown only on desktop when Notes tab is active) */}
                 {queryFilteredFolders.length > 0 && (
-                  <div className="flex flex-col gap-3">
+                  <div className="hidden md:flex flex-col gap-3">
                     <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground/60">
                       Pastas ({queryFilteredFolders.length})
                     </div>
@@ -478,48 +575,187 @@ export function NotesDashboard({
                   </div>
                 )}
 
-                {/* Notes Section */}
-                {(queryFilteredNotes.length > 0 || isDragOverGrid) && (
+                {/* Notes Masonry Grid Section */}
+                {queryFilteredNotes.length > 0 || isDragOverGrid ? (
                   <div className="flex flex-col gap-3">
                     <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground/60">
                       Notas e Arquivos ({queryFilteredNotes.length + (isDragOverGrid ? 1 : 0)})
                     </div>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                    <div className="columns-1 sm:columns-2 md:columns-3 lg:columns-4 gap-4 space-y-4 [column-fill:_balance]">
                       {queryFilteredNotes.map((note) => (
-                        <motion.div
-                          key={note.id}
-                          layout
-                          transition={{ type: "spring", stiffness: 200, damping: 24 }}
-                        >
-                          <NoteCard
-                            note={note}
-                            searchQuery={searchQuery}
-                            isSelected={selectedNoteIds.has(note.id)}
-                            onToggleSelect={() => toggleSelectNote(note.id)}
-                            isSelectionActive={isSelectionActive}
-                            onOpenNote={(n) => {
-                              setEditingNote(n);
-                              setNoteVaultOpen(true);
-                            }}
-                          />
-                        </motion.div>
+                        <div key={note.id} className="break-inside-avoid">
+                          <motion.div
+                            key={note.id}
+                            layout
+                            transition={{ type: "spring", stiffness: 200, damping: 24 }}
+                          >
+                            <NoteCard
+                              note={note}
+                              tags={localTags}
+                              searchQuery={searchQuery}
+                              isSelected={selectedNoteIds.has(note.id)}
+                              onToggleSelect={() => toggleSelectNote(note.id)}
+                              isSelectionActive={isSelectionActive}
+                              onOpenNote={(n) => {
+                                setEditingNote(n);
+                                setNoteVaultOpen(true);
+                              }}
+                            />
+                          </motion.div>
+                        </div>
                       ))}
                       {isDragOverGrid && (
-                        <motion.div
-                          key="grid-placeholder"
-                          layout
-                          initial={{ opacity: 0, scale: 0.95 }}
-                          animate={{ opacity: 1, scale: 1 }}
-                          exit={{ opacity: 0, scale: 0.95 }}
-                          transition={{ type: "spring", stiffness: 200, damping: 24 }}
-                          className="rounded-xl border-2 border-dashed border-primary/30 bg-primary/5 animate-pulse p-4 min-h-[160px] flex flex-col justify-center items-center text-primary/40 text-xs font-semibold"
-                        >
-                          <FileText className="size-6 mb-1.5 opacity-60" />
-                          Solte para converter em Nota
-                        </motion.div>
+                        <div className="break-inside-avoid">
+                          <motion.div
+                            key="grid-placeholder"
+                            layout
+                            initial={{ opacity: 0, scale: 0.95 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            exit={{ opacity: 0, scale: 0.95 }}
+                            transition={{ type: "spring", stiffness: 200, damping: 24 }}
+                            className="rounded-2xl border-2 border-dashed border-primary/30 bg-primary/5 animate-pulse p-4 min-h-[160px] flex flex-col justify-center items-center text-primary/40 text-xs font-semibold"
+                          >
+                            <FileText className="size-6 mb-1.5 opacity-60" />
+                            Solte para converter em Nota
+                          </motion.div>
+                        </div>
                       )}
                     </div>
                   </div>
+                ) : (
+                  searchQuery ? (
+                    <EmptyResults searchQuery={searchQuery} />
+                  ) : (
+                    <Empty className="py-20 border-none bg-transparent">
+                      <EmptyHeader>
+                        <EmptyMedia variant="icon">
+                          <FileText className="size-6 text-muted-foreground" />
+                        </EmptyMedia>
+                        <EmptyTitle>Nenhuma nota por aqui</EmptyTitle>
+                        <EmptyDescription>
+                          Toque no botão + no canto inferior direito para criar sua primeira nota.
+                        </EmptyDescription>
+                      </EmptyHeader>
+                    </Empty>
+                  )
+                )}
+              </>
+            )}
+
+            {activeTab === "folders" && (
+              <>
+                {queryFilteredFolders.length > 0 ? (
+                  <div className="flex flex-col gap-3">
+                    <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground/60">
+                      Pastas ({queryFilteredFolders.length})
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+                      {queryFilteredFolders.map((folder) => (
+                        <FolderCard
+                          key={folder.id}
+                          folder={folder}
+                          isSelected={selectedFolderIds.has(folder.id)}
+                          onToggleSelect={() => toggleSelectFolder(folder.id)}
+                          isSelectionActive={isSelectionActive}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                ) : (
+                  searchQuery ? (
+                    <EmptyResults searchQuery={searchQuery} />
+                  ) : (
+                    <Empty className="py-20 border-none bg-transparent">
+                      <EmptyHeader>
+                        <EmptyMedia variant="icon">
+                          <FileText className="size-6 text-muted-foreground" />
+                        </EmptyMedia>
+                        <EmptyTitle>Nenhuma pasta criada</EmptyTitle>
+                        <EmptyDescription>
+                          Toque no botão + no canto inferior direito para organizar seus estudos em pastas.
+                        </EmptyDescription>
+                      </EmptyHeader>
+                    </Empty>
+                  )
+                )}
+              </>
+            )}
+
+            {activeTab === "archive" && (
+              <>
+                {queryFilteredArchivedFolders.length > 0 || queryFilteredArchivedNotes.length > 0 ? (
+                  <div className="flex flex-col gap-6">
+                    {/* Archived Folders */}
+                    {queryFilteredArchivedFolders.length > 0 && (
+                      <div className="flex flex-col gap-3">
+                        <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground/60">
+                          Pastas Arquivadas ({queryFilteredArchivedFolders.length})
+                        </div>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+                          {queryFilteredArchivedFolders.map((folder) => (
+                            <FolderCard
+                              key={folder.id}
+                              folder={folder}
+                              isSelected={selectedFolderIds.has(folder.id)}
+                              onToggleSelect={() => toggleSelectFolder(folder.id)}
+                              isSelectionActive={isSelectionActive}
+                              mode="archive"
+                            />
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Archived Notes */}
+                    {queryFilteredArchivedNotes.length > 0 && (
+                      <div className="flex flex-col gap-3">
+                        <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground/60">
+                          Notas Arquivadas ({queryFilteredArchivedNotes.length})
+                        </div>
+                        <div className="columns-1 sm:columns-2 md:columns-3 lg:columns-4 gap-4 space-y-4 [column-fill:_balance]">
+                          {queryFilteredArchivedNotes.map((note) => (
+                            <div key={note.id} className="break-inside-avoid">
+                              <motion.div
+                                key={note.id}
+                                layout
+                                transition={{ type: "spring", stiffness: 200, damping: 24 }}
+                              >
+                                <NoteCard
+                                  note={note}
+                                  tags={localTags}
+                                  searchQuery={searchQuery}
+                                  isSelected={selectedNoteIds.has(note.id)}
+                                  onToggleSelect={() => toggleSelectNote(note.id)}
+                                  isSelectionActive={isSelectionActive}
+                                  mode="archive"
+                                  onOpenNote={(n) => {
+                                    setEditingNote(n);
+                                    setNoteVaultOpen(true);
+                                  }}
+                                />
+                              </motion.div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  searchQuery ? (
+                    <EmptyResults searchQuery={searchQuery} />
+                  ) : (
+                    <Empty className="py-20 border-none bg-transparent">
+                      <EmptyHeader>
+                        <EmptyMedia variant="icon">
+                          <FileText className="size-6 text-muted-foreground" />
+                        </EmptyMedia>
+                        <EmptyTitle>Nenhum item arquivado</EmptyTitle>
+                        <EmptyDescription>
+                          Notas e pastas que você arquivar aparecerão aqui para manter sua área de trabalho limpa.
+                        </EmptyDescription>
+                      </EmptyHeader>
+                    </Empty>
+                  )
                 )}
               </>
             )}
@@ -562,10 +798,12 @@ export function NotesDashboard({
         />
         <NoteDetailsVault
           note={editingNote}
+          tags={localTags}
           open={noteVaultOpen}
           onOpenChange={setNoteVaultOpen}
           onNoteUpdated={(updatedNote) => {
             setLocalNotes((curr) => curr.map((n) => (n.id === updatedNote.id ? updatedNote : n)));
+            setEditingNote(updatedNote);
           }}
         />
       </div>

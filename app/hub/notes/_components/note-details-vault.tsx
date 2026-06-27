@@ -3,7 +3,8 @@
 import { useEffect, useRef, useState } from "react";
 import { SimpleEditor } from "@/components/tiptap-templates/simple/simple-editor";
 import { updateNoteAction } from "@/modules/notes/notes.actions";
-import { Note } from "@/modules/notes/notes.schema";
+import { Note, Tag } from "@/modules/notes/notes.schema";
+import { NoteTagManager } from "./note-tag-manager";
 import { Loader2, CheckCircle2, AlertCircle } from "lucide-react";
 import { saveOfflineItem } from "@/lib/offline-db";
 import {
@@ -16,6 +17,7 @@ import {
 
 interface NoteDetailsVaultProps {
   note: Note | null;
+  tags?: Tag[];
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onNoteUpdated?: (note: Note) => void;
@@ -23,6 +25,7 @@ interface NoteDetailsVaultProps {
 
 export function NoteDetailsVault({
   note,
+  tags = [],
   open,
   onOpenChange,
   onNoteUpdated,
@@ -32,12 +35,14 @@ export function NoteDetailsVault({
   const [noteContent, setNoteContent] = useState("");
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
+  const [localTagIds, setLocalTagIds] = useState<string[]>([]);
   const [prevNote, setPrevNote] = useState<Note | null>(null);
 
   if (note !== prevNote) {
     setPrevNote(note);
     setNoteTitle(note ? note.title : "");
     setNoteContent(note ? note.content || "" : "");
+    setLocalTagIds(note ? note.tagIds : []);
     setSaveStatus("saved");
   }
 
@@ -118,7 +123,19 @@ export function NoteDetailsVault({
               content={noteContent}
               onChange={handleContentChange}
               onTitleChange={handleTitleChange}
-            />
+            >
+              <NoteTagManager
+                noteTagIds={localTagIds}
+                allTags={tags}
+                onToggleTag={(tagId) => {
+                  const nextTagIds = localTagIds.includes(tagId)
+                    ? localTagIds.filter((id) => id !== tagId)
+                    : [...localTagIds, tagId];
+                  setLocalTagIds(nextTagIds);
+                  triggerSave({ tagIds: nextTagIds });
+                }}
+              />
+            </SimpleEditor>
           </div>
 
           {/* Synchronization status indicator */}

@@ -3,18 +3,21 @@
 import { useEffect, useRef, useState } from "react";
 import { SimpleEditor } from "@/components/tiptap-templates/simple/simple-editor";
 import { updateNoteAction } from "@/modules/notes/notes.actions";
-import { Note } from "@/modules/notes/notes.schema";
+import { Note, Tag } from "@/modules/notes/notes.schema";
+import { NoteTagManager } from "../_components/note-tag-manager";
 import { Loader2, CheckCircle2, AlertCircle } from "lucide-react";
 import { saveOfflineItem } from "@/lib/offline-db";
 
 interface NoteEditorClientProps {
   note: Note;
+  tags?: Tag[];
 }
 
-export function NoteEditorClient({ note }: NoteEditorClientProps) {
+export function NoteEditorClient({ note, tags = [] }: NoteEditorClientProps) {
   const [saveStatus, setSaveStatus] = useState<"saved" | "saving" | "error" | "saved_offline">("saved");
   const [noteTitle, setNoteTitle] = useState(note.title);
   const [noteContent, setNoteContent] = useState(note.content || "");
+  const [localTagIds, setLocalTagIds] = useState<string[]>(note.tagIds);
   const [prevNote, setPrevNote] = useState(note);
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -22,11 +25,13 @@ export function NoteEditorClient({ note }: NoteEditorClientProps) {
   if (note.id !== prevNote.id) {
     setNoteTitle(note.title);
     setNoteContent(note.content || "");
+    setLocalTagIds(note.tagIds);
     setPrevNote(note);
   } else if (note.updatedAt !== prevNote.updatedAt) {
     // Keep prevNote in sync with the server prop to avoid infinite checks,
     // but do NOT overwrite the local editor state if the note is the same.
     setPrevNote(note);
+    setLocalTagIds(note.tagIds);
   }
 
   // Clean up timer on unmount
@@ -93,7 +98,19 @@ export function NoteEditorClient({ note }: NoteEditorClientProps) {
         content={noteContent}
         onChange={handleContentChange}
         onTitleChange={handleTitleChange}
-      />
+      >
+        <NoteTagManager
+          noteTagIds={localTagIds}
+          allTags={tags}
+          onToggleTag={(tagId) => {
+            const nextTagIds = localTagIds.includes(tagId)
+              ? localTagIds.filter((id) => id !== tagId)
+              : [...localTagIds, tagId];
+            setLocalTagIds(nextTagIds);
+            triggerSave({ tagIds: nextTagIds });
+          }}
+        />
+      </SimpleEditor>
 
       {/* Premium floating synchronization status indicator */}
       <div className="fixed bottom-6 right-6 flex items-center gap-2 rounded-full border border-border/60 bg-card/80 px-3.5 py-2 text-xs font-semibold shadow-xl backdrop-blur-md z-[100] animate-in fade-in slide-in-from-bottom-2 duration-300">

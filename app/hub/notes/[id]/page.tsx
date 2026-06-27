@@ -23,6 +23,7 @@ export default async function NotePage({ params }: NotePageProps) {
     redirect("/signin");
   }
   const note = await notesService.getNote(user.id, noteId);
+  const tags = await notesService.getTags(user.id);
 
   const backHref = note.folderId
     ? `/hub/notes/folder/${note.folderId}`
@@ -92,7 +93,7 @@ export default async function NotePage({ params }: NotePageProps) {
   // Text note editing flow
   return (
     <div className="w-full h-full min-h-screen">
-      <NoteEditorClient note={note} />
+      <NoteEditorClient note={note} tags={tags} />
     </div>
   );
 }

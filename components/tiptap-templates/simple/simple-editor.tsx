@@ -3,7 +3,8 @@
 import { useRef, useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { EditorContent, EditorContext, useEditor, type Content } from "@tiptap/react"
-import { ArrowLeft } from "lucide-react"
+import { ArrowLeft, Tag } from "lucide-react"
+import { cn } from "@/lib/utils"
 
 // --- Tiptap Core Extensions ---
 import { StarterKit } from "@tiptap/starter-kit"
@@ -79,6 +80,7 @@ interface SimpleEditorProps {
   title?: string;
   onChange?: (html: string) => void;
   onTitleChange?: (newTitle: string) => void;
+  children?: React.ReactNode;
 }
 
 const MainToolbarContent = ({
@@ -88,6 +90,8 @@ const MainToolbarContent = ({
   title,
   onTitleChange,
   onBack,
+  showTags,
+  onToggleTags,
 }: {
   onHighlighterClick: () => void
   onLinkClick: () => void
@@ -95,6 +99,8 @@ const MainToolbarContent = ({
   title: string
   onTitleChange: (v: string) => void
   onBack: () => void
+  showTags: boolean
+  onToggleTags: () => void
 }) => {
   return (
     <>
@@ -114,6 +120,22 @@ const MainToolbarContent = ({
             className="h-8 border-none bg-transparent hover:bg-muted/40 focus:bg-background focus:ring-1 focus:ring-primary/20 text-xs font-semibold rounded-md"
           />
         </div>
+      </ToolbarGroup>
+
+      <ToolbarSeparator />
+
+      <ToolbarGroup>
+        <button
+          onClick={onToggleTags}
+          className={cn(
+            "flex h-8 px-2.5 items-center gap-1.5 rounded-md hover:bg-muted text-muted-foreground hover:text-foreground transition-all duration-200 cursor-pointer border-none outline-none text-xs font-semibold",
+            showTags && "bg-muted text-foreground"
+          )}
+          title="Alternar visualização de tags"
+        >
+          <Tag className="size-3.5" />
+          {!isMobile && <span>Tags</span>}
+        </button>
       </ToolbarGroup>
 
       <Spacer />
@@ -214,6 +236,7 @@ export function SimpleEditor({
   title = "Nova Nota",
   onChange,
   onTitleChange,
+  children,
 }: SimpleEditorProps) {
   const router = useRouter()
   const isMobile = useIsBreakpoint()
@@ -285,6 +308,7 @@ export function SimpleEditor({
     }
   }, [editor, content])
 
+  const [showTags, setShowTags] = useState(true)
   const toolbarRect = useRefRect(toolbarRef)
 
   const rect = useCursorVisibility({
@@ -322,6 +346,8 @@ export function SimpleEditor({
               title={localTitle}
               onTitleChange={handleTitleChangeLocal}
               onBack={() => router.push("/hub/notes")}
+              showTags={showTags}
+              onToggleTags={() => setShowTags(!showTags)}
             />
           ) : (
             <MobileToolbarContent
@@ -331,6 +357,7 @@ export function SimpleEditor({
           )}
         </Toolbar>
 
+        {showTags && children}
         <EditorContent
           editor={editor}
           role="presentation"
