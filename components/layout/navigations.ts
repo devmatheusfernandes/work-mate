@@ -1,6 +1,5 @@
 import {
   StickyNote,
-  Archive,
   Settings,
   Trash,
   MessageCircle,
@@ -13,11 +12,6 @@ export const sidebarNavItems: MenuItemType[] = [
     href: "/hub/notes",
     label: "Notas",
     Icon: StickyNote,
-  },
-  {
-    href: "/hub/archive",
-    label: "Arquivadas",
-    Icon: Archive,
   },
   {
     href: "/hub/chat",

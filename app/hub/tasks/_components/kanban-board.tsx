@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Note, TaskStatus } from "@/modules/notes/notes.schema";
 import { Header } from "@/components/layout/header";
@@ -23,6 +23,7 @@ import { TaskDetailPanel } from "./task-detail-panel";
 import { TaskDetailsVault } from "@/app/hub/notes/_components/task-details-vault";
 import { CreateButton } from "@/app/hub/notes/_components/create-button";
 import { Tag } from "@/modules/notes/notes.schema";
+import { subscribeToTaskUpdates } from "@/modules/notes/tasks.store";
 
 const COLUMNS: {
   status: TaskStatus;
@@ -213,6 +214,15 @@ export function KanbanBoard({ tasks, tags }: { tasks: Note[]; tags: Tag[] }) {
     () => localTasks.find((t) => t.id === effectiveSelectedTaskId) ?? null,
     [localTasks, effectiveSelectedTaskId],
   );
+
+  useEffect(() => {
+    const unsubscribe = subscribeToTaskUpdates((id, updates) => {
+      setLocalTasks((current) =>
+        current.map((t) => (t.id === id ? { ...t, ...updates } as Note : t))
+      );
+    });
+    return unsubscribe;
+  }, []);
 
   const tasksByStatus = useMemo(() => {
     const map: Record<TaskStatus, Note[]> = {

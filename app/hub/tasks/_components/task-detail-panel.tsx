@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { Note, TaskStatus, Subtask } from "@/modules/notes/notes.schema";
+import { notifyTaskUpdate } from "@/modules/notes/tasks.store";
 import { EditorContent, useEditor, type Content } from "@tiptap/react";
 import { StarterKit } from "@tiptap/starter-kit";
 import { TaskItem, TaskList } from "@tiptap/extension-list";
@@ -139,6 +140,9 @@ export function TaskDetailPanel({ task, onClose }: TaskDetailPanelProps) {
     if (task.id.startsWith("temp_")) {
       return; // Hold edits in local state
     }
+    
+    notifyTaskUpdate(task.id, updates);
+    
     try {
       await updateNoteAction({
         id: task.id,
@@ -153,9 +157,13 @@ export function TaskDetailPanel({ task, onClose }: TaskDetailPanelProps) {
     if (saveTimeoutRef.current) {
       clearTimeout(saveTimeoutRef.current);
     }
+    
+    notifyTaskUpdate(task.id, updates);
+    
     if (task.id.startsWith("temp_")) {
       return; // Hold edits in local state
     }
+    
     saveTimeoutRef.current = setTimeout(async () => {
       try {
         await updateNoteAction({
@@ -165,7 +173,7 @@ export function TaskDetailPanel({ task, onClose }: TaskDetailPanelProps) {
       } catch (err) {
         console.error("Erro no auto-save debounced do editor:", err);
       }
-    }, 1200);
+    }, 800);
   }, [task.id]);
 
   // Clean up timer on unmount
@@ -286,12 +294,16 @@ export function TaskDetailPanel({ task, onClose }: TaskDetailPanelProps) {
         <input
           type="text"
           value={title}
-          onChange={(e) => setTitle(e.target.value)}
+          onChange={(e) => {
+            setTitle(e.target.value);
+            triggerDebouncedSave({ title: e.target.value });
+          }}
           onBlur={() => {
             const trimmed = title.trim();
             if (!trimmed) {
               setTitle(task.title);
               toast.error("O título da tarefa não pode ser vazio.");
+              triggerDebouncedSave({ title: task.title });
               return;
             }
             if (trimmed !== task.title) {
