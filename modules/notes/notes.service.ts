@@ -2,6 +2,7 @@ import { notesRepository } from "./notes.repository";
 import { notesStorageService } from "./notes-storage.service";
 import { Note, Folder, Tag, CreateNoteDTO, CreateFolderDTO, CreateTagDTO } from "./notes.schema";
 import { vectorService } from "../vector/vector.service";
+import https from "https";
 
 type NoteSourceType = "note" | "pdf" | "task" | "excel";
 
@@ -283,6 +284,15 @@ export const notesService = {
       }
     }
 
+    const hasEmbeddingFieldsChanged = 
+      (data.title !== undefined && data.title !== note.title) ||
+      (data.content !== undefined && JSON.stringify(data.content) !== JSON.stringify(note.content)) ||
+      (data.searchText !== undefined && data.searchText !== note.searchText) ||
+      (data.type !== undefined && data.type !== note.type) ||
+      (data.taskStatus !== undefined && data.taskStatus !== note.taskStatus) ||
+      (data.taskDeadline !== undefined && data.taskDeadline !== note.taskDeadline) ||
+      (data.taskSubtasks !== undefined && JSON.stringify(data.taskSubtasks) !== JSON.stringify(note.taskSubtasks));
+
     const updatedNote = await notesRepository.updateNote(userId, id, data);
 
     // Sync images: soft-delete any images no longer present in the content
@@ -294,7 +304,7 @@ export const notesService = {
     // Se a nota foi para a lixeira, removemos da fila de embeddings
     if (updatedNote.trashed) {
       await vectorService.dequeue(updatedNote.id, updatedNote.type as NoteSourceType);
-    } else {
+    } else if (hasEmbeddingFieldsChanged) {
       try {
         await vectorService.embedNow(userId, updatedNote.id, updatedNote.type as NoteSourceType, getContentToEmbed(updatedNote));
         isVectorized = true;
@@ -303,6 +313,8 @@ export const notesService = {
         // Fallback: garante que fica na fila
         await vectorService.enqueue(userId, updatedNote.id, updatedNote.type as NoteSourceType, getContentToEmbed(updatedNote));
       }
+    } else {
+      isVectorized = await vectorService.isNoteVectorized(id);
     }
 
     return { ...updatedNote, isVectorized };
@@ -438,8 +450,57 @@ export const notesService = {
 
   async embedNoteNow(userId: string, id: string): Promise<void> {
     const note = await this.getNote(userId, id);
-    const contentToEmbed = getContentToEmbed(note);
-    await vectorService.embedNow(userId, note.id, note.type as NoteSourceType, contentToEmbed);
+    let updatedNote = note;
+
+    if ((note.type === "pdf" || note.type === "excel") && note.fileUrl) {
+      try {
+        const buffer = await new Promise<Buffer>((resolve, reject) => {
+          https.get(note.fileUrl!, (res) => {
+            if (res.statusCode !== 200) {
+              reject(new Error(`Status ${res.statusCode}`));
+              return;
+            }
+            const chunks: Buffer[] = [];
+            res.on("data", (chunk) => chunks.push(chunk));
+            res.on("end", () => resolve(Buffer.concat(chunks)));
+            res.on("error", reject);
+          }).on("error", reject);
+        });
+
+        let extractedText = "";
+
+        if (note.type === "pdf") {
+          // eslint-disable-next-line @typescript-eslint/no-require-imports
+          const { PDFParse } = require("pdf-parse");
+          const pdfParser = new PDFParse(new Uint8Array(buffer));
+          await pdfParser.load();
+          const parsed = await pdfParser.getText();
+          extractedText = (parsed?.text || "").trim().slice(0, 50_000);
+          pdfParser.destroy();
+        } else if (note.type === "excel") {
+          // eslint-disable-next-line @typescript-eslint/no-require-imports
+          const XLSX = require("xlsx");
+          const workbook = XLSX.read(buffer, { type: "buffer" });
+          for (const sheetName of workbook.SheetNames) {
+            const sheet = workbook.Sheets[sheetName];
+            const csvText = XLSX.utils.sheet_to_csv(sheet);
+            if (csvText.trim()) {
+              extractedText += `Planilha/Aba: ${sheetName}\n${csvText}\n\n`;
+            }
+          }
+          extractedText = extractedText.trim().slice(0, 50_000);
+        }
+
+        updatedNote = await notesRepository.updateNote(userId, id, {
+          searchText: extractedText,
+        });
+      } catch (err) {
+        console.error(`Erro ao extrair texto do arquivo ${note.type} durante vetorização manual:`, err);
+      }
+    }
+
+    const contentToEmbed = getContentToEmbed(updatedNote);
+    await vectorService.embedNow(userId, updatedNote.id, updatedNote.type as NoteSourceType, contentToEmbed);
   },
 
   getFormattedContent(note: Note): string {

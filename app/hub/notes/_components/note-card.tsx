@@ -25,6 +25,7 @@ interface NoteCardProps {
   isSelectionActive: boolean;
   mode?: "normal" | "archive" | "trash";
   onOpenNote?: (note: Note) => void;
+  onUpdateNote?: (id: string, updates: Partial<Note>) => void;
 }
 
 export function NoteCard({
@@ -35,6 +36,7 @@ export function NoteCard({
   isSelectionActive,
   mode = "normal",
   onOpenNote,
+  onUpdateNote,
 }: NoteCardProps) {
   const router = useRouter();
   const [taskVaultOpen, setTaskVaultOpen] = useState(false);
@@ -76,26 +78,34 @@ export function NoteCard({
   const handleTogglePin = async (e: React.MouseEvent) => {
     e.stopPropagation();
     const nextPinned = !note.pinned;
+    onUpdateNote?.(note.id, { pinned: nextPinned });
     try {
       const res = await updateNoteAction({ id: note.id, updates: { pinned: nextPinned } });
       if (res?.data?.success) {
         toast.success(nextPinned ? "Nota fixada!" : "Nota desafixada!");
+      } else {
+        onUpdateNote?.(note.id, { pinned: !nextPinned });
       }
     } catch {
       toast.error("Erro ao atualizar nota.");
+      onUpdateNote?.(note.id, { pinned: !nextPinned });
     }
   };
 
   const handleToggleLock = async (e: React.MouseEvent) => {
     e.stopPropagation();
     const nextLocked = !note.isLocked;
+    onUpdateNote?.(note.id, { isLocked: nextLocked });
     try {
       const res = await updateNoteAction({ id: note.id, updates: { isLocked: nextLocked } });
       if (res?.data?.success) {
         toast.success(nextLocked ? "Nota trancada!" : "Nota destrancada!");
+      } else {
+        onUpdateNote?.(note.id, { isLocked: !nextLocked });
       }
     } catch {
       toast.error("Erro ao atualizar nota.");
+      onUpdateNote?.(note.id, { isLocked: !nextLocked });
     }
   };
 
@@ -181,6 +191,7 @@ export function NoteCard({
       const res = await embedNoteNowAction({ id: note.id });
       if (res?.data?.success) {
         toast.success("Nota vetorizada com sucesso!", { id: toastId });
+        onUpdateNote?.(note.id, { isVectorized: true });
       } else {
         toast.error(res?.data?.error || "Erro ao vetorizar nota.", { id: toastId });
       }
@@ -220,6 +231,11 @@ export function NoteCard({
   };
 
   const previewText = note.searchText || "Sem conteúdo...";
+
+  const isRealVectorized = !!(note.isVectorized && (
+    note.type === "task" ||
+    (note.searchText && note.searchText.trim() !== "")
+  ));
 
   return (
     <>
@@ -279,7 +295,7 @@ export function NoteCard({
                   {note.isLocked ? "Destrancar" : "Trancar"}
                 </DropdownMenuItem>
                 <DropdownMenuItem className="items-center flex flex-col justify-center" onClick={handleEmbedNow}>
-                  Vetorizar agora
+                  {isRealVectorized ? "Atualizar vetor" : "Vetorizar agora"}
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem className="items-center flex flex-col justify-center"
@@ -344,55 +360,80 @@ export function NoteCard({
         "flex-1 flex flex-col justify-start transition-all duration-300 pr-7 mt-1",
         (isSelectionActive || isSelected) ? "pl-7" : "group-hover:pl-7 pl-0"
       )}>
-        {/* Tags Row (Includes inline PDF badge) */}
-        {(noteTags.length > 0 || note.type === "pdf" || note.type === "excel") && (
-          <div className="flex flex-wrap gap-1 mb-2.5">
-            {note.type === "pdf" && (
+        {/* Tags Row (Includes inline PDF/Excel badges and Vectorization status badge) */}
+        <div className="flex flex-wrap gap-1.5 mb-2.5 items-center">
+          {note.type === "pdf" && (
+            <span
+              className={cn(
+                "text-[9px] font-bold tracking-wider px-2 py-0.5 rounded-full uppercase border flex items-center gap-1 shrink-0",
+                note.pinned
+                  ? "bg-white/15 text-white border-white/20"
+                  : "bg-red-500/10 text-red-600 border-red-500/20"
+              )}
+            >
+              <FileText className="size-3" />
+              PDF
+            </span>
+          )}
+          {note.type === "excel" && (
+            <span
+              className={cn(
+                "text-[9px] font-bold tracking-wider px-2 py-0.5 rounded-full uppercase border flex items-center gap-1 shrink-0",
+                note.pinned
+                  ? "bg-white/15 text-white border-white/20"
+                  : "bg-emerald-500/10 text-emerald-600 border-emerald-500/20"
+              )}
+            >
+              <FileSpreadsheet className="size-3" />
+              EXCEL
+            </span>
+          )}
+          {noteTags.map((tag) => {
+            const isLightBg = tag.color?.includes("yellow") || tag.color?.includes("amber");
+            return (
               <span
+                key={tag.id}
                 className={cn(
-                  "text-[9px] font-bold tracking-wider px-2 py-0.5 rounded-full uppercase border flex items-center gap-1 shrink-0",
+                  "text-[9px] font-bold tracking-wider px-2 py-0.5 rounded-full uppercase border shrink-0",
                   note.pinned
                     ? "bg-white/15 text-white border-white/20"
-                    : "bg-red-500/10 text-red-600 border-red-500/20"
+                    : tag.color
+                    ? cn(tag.color, isLightBg ? "text-amber-950 border-transparent" : "text-white border-transparent")
+                    : "bg-primary/10 text-primary border-primary/20"
                 )}
               >
-                <FileText className="size-3" />
-                PDF
+                {tag.title}
               </span>
-            )}
-            {note.type === "excel" && (
-              <span
-                className={cn(
-                  "text-[9px] font-bold tracking-wider px-2 py-0.5 rounded-full uppercase border flex items-center gap-1 shrink-0",
-                  note.pinned
-                    ? "bg-white/15 text-white border-white/20"
-                    : "bg-emerald-500/10 text-emerald-600 border-emerald-500/20"
-                )}
-              >
-                <FileSpreadsheet className="size-3" />
-                EXCEL
-              </span>
-            )}
-            {noteTags.map((tag) => {
-              const isLightBg = tag.color?.includes("yellow") || tag.color?.includes("amber");
-              return (
-                <span
-                  key={tag.id}
-                  className={cn(
-                    "text-[9px] font-bold tracking-wider px-2 py-0.5 rounded-full uppercase border shrink-0",
-                    note.pinned
-                      ? "bg-white/15 text-white border-white/20"
-                      : tag.color
-                      ? cn(tag.color, isLightBg ? "text-amber-950 border-transparent" : "text-white border-transparent")
-                      : "bg-primary/10 text-primary border-primary/20"
-                  )}
-                >
-                  {tag.title}
-                </span>
-              );
-            })}
-          </div>
-        )}
+            );
+          })}
+
+          {/* Vectorization Status Badge */}
+          {isRealVectorized ? (
+            <span
+              className={cn(
+                "text-[9px] font-bold tracking-wider px-2 py-0.5 rounded-full uppercase border flex items-center gap-1 shrink-0 transition-colors duration-200",
+                note.pinned
+                  ? "bg-white/15 text-white border-white/20"
+                  : "bg-emerald-500/10 text-emerald-600 border-emerald-500/20"
+              )}
+            >
+              <span className="size-1 rounded-full bg-current animate-pulse" />
+              IA Ativa
+            </span>
+          ) : (
+            <span
+              className={cn(
+                "text-[9px] font-bold tracking-wider px-2 py-0.5 rounded-full uppercase border flex items-center gap-1 shrink-0 transition-colors duration-200",
+                note.pinned
+                  ? "bg-white/10 text-white/80 border-white/10"
+                  : "bg-amber-500/10 text-amber-600 border-amber-500/20"
+              )}
+            >
+              <span className="size-1 rounded-full bg-current" />
+              IA Pendente
+            </span>
+          )}
+        </div>
 
         {/* Title */}
         <h3 className={cn(
@@ -478,28 +519,6 @@ export function NoteCard({
       )}>
         <div className="flex items-center gap-2">
           <span>{formatFriendlyDate(note.createdAt)}</span>
-          <span className={cn("h-2 w-px", note.pinned ? "bg-white/10" : "bg-border/40")} />
-          {note.isVectorized ? (
-            <span className={cn(
-              "flex items-center gap-1 text-[9px] font-semibold px-1.5 py-0.5 rounded-md border",
-              note.pinned
-                ? "text-white bg-white/15 border-white/20"
-                : "text-emerald-500 bg-emerald-500/10 border-emerald-500/20"
-            )}>
-              <span className={cn("size-1 rounded-full animate-pulse", note.pinned ? "bg-white" : "bg-emerald-500")} />
-              IA Ativa
-            </span>
-          ) : (
-            <span className={cn(
-              "flex items-center gap-1 text-[9px] font-semibold px-1.5 py-0.5 rounded-md border",
-              note.pinned
-                ? "text-blue-200/60 bg-white/5 border-white/10"
-                : "text-muted-foreground bg-muted/40 border-border/20"
-            )}>
-              <span className={cn("size-1 rounded-full", note.pinned ? "bg-blue-300/40" : "bg-muted-foreground/60")} />
-              IA Pendente
-            </span>
-          )}
         </div>
         {note.pinned && <Pin className="size-3 text-white fill-white/10" />}
       </div>

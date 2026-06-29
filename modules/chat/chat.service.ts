@@ -60,6 +60,9 @@ export const chatService = {
       await chatRepository.updateSessionTitle(userId, session.id, newTitle);
     }
 
+    // Fetch conversation history early to inspect for references and construct history
+    const historyMessages = await chatRepository.getMessagesBySession(session.id);
+
     // 2. Query vector embeddings (RAG)
     let relevantNotesContext = "";
     let maxPrecisionScore = 0; // pgvector similarity percentage
@@ -98,10 +101,16 @@ ${notesService.getFormattedContent(n)}`;
     // 2.5 Find and fetch direct references (notes, tasks, calendars)
     let directReferencesContext = "";
     try {
+      // Scan current message and last 4 history messages to retrieve any referenced note/task IDs
+      const recentContextText = [
+        content,
+        ...historyMessages.slice(-4).map(m => m.content)
+      ].join("\n");
+
       // Matches both note link path: /hub/notes/ID and task link path: /hub/tasks?taskId=ID
       const noteIds = Array.from(new Set([
-        ...Array.from(content.matchAll(/\/hub\/notes\/([a-zA-Z0-9_-]+)/g)).map(m => m[1]),
-        ...Array.from(content.matchAll(/\/hub\/tasks\?taskId=([a-zA-Z0-9_-]+)/g)).map(m => m[1])
+        ...Array.from(recentContextText.matchAll(/\/hub\/notes\/([a-zA-Z0-9_-]+)/g)).map(m => m[1]),
+        ...Array.from(recentContextText.matchAll(/\/hub\/tasks\?taskId=([a-zA-Z0-9_-]+)/g)).map(m => m[1])
       ]));
       
       const noteRefs: string[] = [];
@@ -251,8 +260,6 @@ ${relevantNotesContext || "Nenhum conteúdo detalhado adicional relevante encont
       throw new Error("Chave de API do Gemini não configurada.");
     }
 
-    // Fetch conversation history
-    const historyMessages = await chatRepository.getMessagesBySession(session.id);
     // Convert to Gemini API structure, excluding the very last user message we just saved
     const contents = historyMessages
       .filter(m => m.id !== userMsgId)

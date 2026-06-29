@@ -80,6 +80,12 @@ export function NotesDashboard({
   const [selectedNoteIds, setSelectedNoteIds] = useState<Set<string>>(new Set());
   const [selectedFolderIds, setSelectedFolderIds] = useState<Set<string>>(new Set());
 
+  const handleUpdateNoteLocal = useCallback((id: string, updates: Partial<Note>) => {
+    setLocalNotes((current) =>
+      current.map((n) => (n.id === id ? ({ ...n, ...updates } as Note) : n))
+    );
+  }, []);
+
   const handleUpdateNoteOptimistic = useCallback(
     async (
       id: string,
@@ -652,6 +658,7 @@ export function NotesDashboard({
                                 setEditingNote(n);
                                 setNoteVaultOpen(true);
                               }}
+                              onUpdateNote={handleUpdateNoteLocal}
                             />
                           </motion.div>
                         </div>
@@ -784,6 +791,7 @@ export function NotesDashboard({
                                     setEditingNote(n);
                                     setNoteVaultOpen(true);
                                   }}
+                                  onUpdateNote={handleUpdateNoteLocal}
                                 />
                               </motion.div>
                             </div>

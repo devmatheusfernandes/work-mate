@@ -2,9 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/safe-action";
 import { notesStorageService } from "@/modules/notes/notes-storage.service";
 import { notesService } from "@/modules/notes/notes.service";
-// pdf-parse é CJS puro; require() evita o resolver ESM que não tem default export
 // eslint-disable-next-line @typescript-eslint/no-require-imports
-const pdfParse = require("pdf-parse") as (buffer: Buffer) => Promise<{ text: string; numpages: number; info: Record<string, unknown> }>;
+const { PDFParse } = require("pdf-parse");
 
 export async function POST(req: NextRequest) {
   try {
@@ -43,11 +42,13 @@ export async function POST(req: NextRequest) {
     // 4. Extrair texto do PDF server-side para indexação semântica
     let extractedText = "";
     try {
-      const pdfData = await pdfParse(buffer);
-      // Limita a 50.000 caracteres para não exceder limites do modelo de embedding
-      extractedText = pdfData.text.trim().slice(0, 50_000);
+      const pdfParser = new PDFParse(new Uint8Array(buffer));
+      await pdfParser.load();
+      const parsed = await pdfParser.getText();
+      extractedText = (parsed?.text || "").trim().slice(0, 50_000);
+      pdfParser.destroy();
     } catch (parseError) {
-      console.warn("Não foi possível extrair texto do PDF (pode ser escaneado/imagem):", parseError);
+      console.warn("Não foi possível extrair texto do PDF:", parseError);
       // Continua sem texto: o PDF ainda é salvo, mas sem busca semântica por conteúdo
     }
 
