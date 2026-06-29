@@ -53,7 +53,7 @@ export const vectorService = {
   },
 
   // Adiciona ou atualiza um item na fila de vetorização
-  async enqueue(userId: string, sourceId: string, sourceType: "note" | "pdf" | "task", contentToEmbed: string) {
+  async enqueue(userId: string, sourceId: string, sourceType: "note" | "pdf" | "task" | "excel", contentToEmbed: string) {
     // Garante que não fiquem restos de tipos antigos (ex: nota que virou tarefa)
     await vectorRepository.deleteQueueItemsForOtherTypes(sourceId, sourceType);
 
@@ -66,7 +66,7 @@ export const vectorService = {
   },
 
   // Remove um item da fila (ex: deleção física da nota)
-  async dequeue(sourceId: string, sourceType: "note" | "pdf" | "task") {
+  async dequeue(sourceId: string, sourceType: "note" | "pdf" | "task" | "excel") {
     await vectorRepository.deleteQueueItem(sourceId, sourceType);
   },
 
@@ -152,7 +152,7 @@ export const vectorService = {
   },
 
   // Vetoriza e salva um item imediatamente
-  async embedNow(userId: string, sourceId: string, sourceType: "note" | "pdf" | "task", contentToEmbed: string) {
+  async embedNow(userId: string, sourceId: string, sourceType: "note" | "pdf" | "task" | "excel", contentToEmbed: string) {
     // 1. Enfileira o item (upsert) e limpa tipos antigos
     await this.enqueue(userId, sourceId, sourceType, contentToEmbed);
     

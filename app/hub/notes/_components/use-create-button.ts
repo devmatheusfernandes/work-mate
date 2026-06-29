@@ -253,29 +253,37 @@ export function useCreateButton({
     const file = e.target.files?.[0];
     if (!file) return;
 
-    if (file.type !== "application/pdf") {
-      toast.error("Por favor, selecione um arquivo PDF.");
+    const fileExtension = file.name.split(".").pop()?.toLowerCase();
+    const isPdf = file.type === "application/pdf" || fileExtension === "pdf";
+    const isExcel = ["xlsx", "xls", "csv"].includes(fileExtension || "");
+
+    if (!isPdf && !isExcel) {
+      toast.error("Por favor, selecione um arquivo PDF, Excel (.xlsx, .xls) ou CSV (.csv).");
       return;
     }
 
+    const type = isPdf ? "pdf" : "excel";
+    const label = isPdf ? "PDF" : "planilha";
+    const uploadUrl = isPdf ? "/api/notes/upload-pdf" : "/api/notes/upload-excel";
+
     setIsUploadingPdf(true);
     setIsOpenMenu(false);
-    const toastId = toast.loading("Enviando PDF...");
+    const toastId = toast.loading(`Enviando ${label}...`);
 
-    try {
-      const reader = new FileReader();
-      reader.onload = async () => {
-        const fileUrl = reader.result as string;
-        const isOffline = typeof window !== "undefined" && !window.navigator.onLine;
+    const isOffline = typeof window !== "undefined" && !window.navigator.onLine;
 
-        if (isOffline) {
-          const tempId = `temp_pdf_${Date.now()}`;
-          const newPdf: Note = {
+    if (isOffline) {
+      try {
+        const reader = new FileReader();
+        reader.onload = async () => {
+          const fileUrl = reader.result as string;
+          const tempId = `temp_file_${Date.now()}`;
+          const newFileNote: Note = {
             userId: "local",
             id: tempId,
             title: file.name.replace(/\.[^/.]+$/, ""),
             folderId: activeFolderId,
-            type: "pdf",
+            type,
             fileUrl,
             archived: false,
             trashed: false,
@@ -293,7 +301,7 @@ export function useCreateButton({
           };
 
           try {
-            await saveOfflineItem("notes", newPdf);
+            await saveOfflineItem("notes", newFileNote);
             await saveOfflineItem("syncQueue", {
               id: `op_${tempId}`,
               actionName: "createNote",
@@ -301,53 +309,69 @@ export function useCreateButton({
                 id: tempId,
                 title: file.name.replace(/\.[^/.]+$/, ""),
                 folderId: activeFolderId,
-                type: "pdf",
+                type,
                 fileUrl,
               },
               timestamp: Date.now(),
             });
 
-            toast.success("PDF salvo localmente offline!", { id: toastId });
+            toast.success(`${isPdf ? "PDF" : "Planilha"} salva localmente offline!`, { id: toastId });
             if (onNoteCreatedOffline) {
-              onNoteCreatedOffline(newPdf);
+              onNoteCreatedOffline(newFileNote);
             } else {
               window.location.reload();
             }
           } catch (err) {
             console.error(err);
-            toast.error("Erro ao salvar PDF offline.", { id: toastId });
+            toast.error(`Erro ao salvar ${label} offline.`, { id: toastId });
           } finally {
             setIsUploadingPdf(false);
           }
-          return;
-        }
-
-        const res = await createNoteAction({
-          title: file.name.replace(/\.[^/.]+$/, ""),
-          folderId: activeFolderId,
-          type: "pdf",
-          fileUrl,
-        });
-
-        if (res?.data?.success && res.data.note) {
-          toast.success("PDF enviado com sucesso!", { id: toastId });
-          router.push(`/hub/notes/${res.data.note.id}`);
-        } else {
-          toast.error("Erro ao enviar PDF.", { id: toastId });
-        }
+        };
+        reader.onerror = () => {
+          toast.error("Erro ao ler o arquivo.", { id: toastId });
+          setIsUploadingPdf(false);
+        };
+        reader.readAsDataURL(file);
+      } catch (err) {
+        console.error(err);
+        toast.error(`Erro inesperado ao salvar ${label} offline.`, { id: toastId });
         setIsUploadingPdf(false);
-      };
-      reader.onerror = () => {
-        toast.error("Erro ao ler o arquivo.", { id: toastId });
-        setIsUploadingPdf(false);
-      };
-      reader.readAsDataURL(file);
+      }
+      return;
+    }
+
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("title", file.name.replace(/\.[^/.]+$/, ""));
+      if (activeFolderId) {
+        formData.append("folderId", activeFolderId);
+      }
+
+      const response = await fetch(uploadUrl, {
+        method: "POST",
+        body: formData,
+      });
+
+      const data = await response.json();
+
+      if (!response.ok || !data.success) {
+        toast.error(data.error || `Erro ao enviar ${label}.`, { id: toastId });
+        return;
+      }
+
+      toast.success(`${isPdf ? "PDF" : "Planilha"} enviada com sucesso!`, { id: toastId });
+      router.push(`/hub/notes/${data.note.id}`);
     } catch (err) {
       console.error(err);
-      toast.error("Erro inesperado ao enviar PDF.", { id: toastId });
+      toast.error(`Erro inesperado ao enviar ${label}.`, { id: toastId });
+    } finally {
       setIsUploadingPdf(false);
+      if (e.target) e.target.value = "";
     }
   }, [activeFolderId, router, onNoteCreatedOffline]);
+
 
   const handleMenuItemClick = (key: string) => {
     switch (key) {

@@ -89,7 +89,7 @@ export const noteSchema = z.object({
   pinned: z.boolean().default(false),
   createdAt: z.string(),
   updatedAt: z.string(),
-  type: z.enum(["note", "pdf", "task"]).default("note"),
+  type: z.enum(["note", "pdf", "task", "excel"]).default("note"),
   fileUrl: z.string().optional().nullable(),
   fileSize: z.number().optional().nullable(),
   isLocked: z.boolean().default(false),
@@ -111,7 +111,7 @@ export const createNoteSchema = noteSchema.omit({
 }).extend({
   title: z.string().min(1, "O título não pode ser vazio").max(150, "O título é muito longo").optional(),
   folderId: z.string().optional().nullable(),
-  type: z.enum(["note", "pdf", "task"]).optional(),
+  type: z.enum(["note", "pdf", "task", "excel"]).optional(),
   taskStatus: taskStatusEnum.nullable().optional(),
   taskDeadline: z.string().nullable().optional(),
   taskSubtasks: z.array(subtaskSchema).optional(),

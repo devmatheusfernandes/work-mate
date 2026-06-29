@@ -19,8 +19,14 @@ export async function GET(req: NextRequest) {
       SELECT name 
       FROM storage.objects 
       WHERE bucket_id = 'notes-files'
-        AND substring(name from 'users/[^/]+/pdfs/([^.]+)\.pdf') NOT IN (
-          SELECT id FROM notes
+        AND (
+          (name LIKE 'users/%/pdfs/%' AND substring(name from 'users/[^/]+/pdfs/([^.]+)\.pdf') NOT IN (
+            SELECT id FROM notes
+          ))
+          OR
+          (name LIKE 'users/%/excels/%' AND substring(name from 'users/[^/]+/excels/([^.]+)\.[^.]+') NOT IN (
+            SELECT id FROM notes
+          ))
         )
     `);
 

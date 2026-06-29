@@ -60,6 +60,63 @@ export const notesStorageService = {
     };
   },
 
+  // Realiza o upload de planilhas para o Supabase Storage
+  async uploadExcel(
+    userId: string,
+    noteId: string,
+    fileBuffer: Buffer,
+    fileName: string,
+    mimeType: string,
+    fileSize: number
+  ): Promise<{ fileUrl: string; filePath: string }> {
+    // 1. Validar cota de armazenamento
+    const currentUsage = await this.getUserStorageUsage(userId);
+    if (currentUsage + fileSize > MAX_STORAGE_BYTES) {
+      throw new Error("Limite de armazenamento excedido (máximo de 200MB).");
+    }
+
+    // 2. Definir caminho do arquivo no bucket
+    const fileExtension = fileName.split(".").pop() || "xlsx";
+    const filePath = `users/${userId}/excels/${noteId}.${fileExtension}`;
+
+    // 3. Fazer upload para o Supabase Storage
+    const { error } = await supabase.storage
+      .from(BUCKET_NAME)
+      .upload(filePath, fileBuffer, {
+        contentType: mimeType,
+        upsert: true,
+      });
+
+    if (error) {
+      console.error("Erro no upload do Supabase Storage:", error);
+      throw new Error(`Falha ao fazer upload do arquivo Excel: ${error.message}`);
+    }
+
+    // 4. Obter a URL pública
+    const { data: urlData } = supabase.storage
+      .from(BUCKET_NAME)
+      .getPublicUrl(filePath);
+
+    return {
+      fileUrl: urlData.publicUrl,
+      filePath,
+    };
+  },
+
+  // Deleta um arquivo Excel do Supabase Storage
+  async deleteExcel(filePath: string): Promise<void> {
+    if (!filePath) return;
+
+    const { error } = await supabase.storage
+      .from(BUCKET_NAME)
+      .remove([filePath]);
+
+    if (error) {
+      console.error(`Erro ao deletar arquivo Excel "${filePath}" do Supabase Storage:`, error);
+      throw new Error(`Falha ao deletar planilha do storage: ${error.message}`);
+    }
+  },
+
   // Realiza o upload de imagens do editor para o Supabase Storage
   async uploadImage(
     userId: string,

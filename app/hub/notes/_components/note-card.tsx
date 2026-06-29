@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { Note, Tag } from "@/modules/notes/notes.schema";
 import { useRouter } from "next/navigation";
-import { FileText, MoreVertical, Pin, Lock } from "lucide-react";
+import { FileText, MoreVertical, Pin, Lock, FileSpreadsheet } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { deleteNoteAction, updateNoteAction, embedNoteNowAction } from "@/modules/notes/notes.actions";
@@ -345,7 +345,7 @@ export function NoteCard({
         (isSelectionActive || isSelected) ? "pl-7" : "group-hover:pl-7 pl-0"
       )}>
         {/* Tags Row (Includes inline PDF badge) */}
-        {(noteTags.length > 0 || note.type === "pdf") && (
+        {(noteTags.length > 0 || note.type === "pdf" || note.type === "excel") && (
           <div className="flex flex-wrap gap-1 mb-2.5">
             {note.type === "pdf" && (
               <span
@@ -358,6 +358,19 @@ export function NoteCard({
               >
                 <FileText className="size-3" />
                 PDF
+              </span>
+            )}
+            {note.type === "excel" && (
+              <span
+                className={cn(
+                  "text-[9px] font-bold tracking-wider px-2 py-0.5 rounded-full uppercase border flex items-center gap-1 shrink-0",
+                  note.pinned
+                    ? "bg-white/15 text-white border-white/20"
+                    : "bg-emerald-500/10 text-emerald-600 border-emerald-500/20"
+                )}
+              >
+                <FileSpreadsheet className="size-3" />
+                EXCEL
               </span>
             )}
             {noteTags.map((tag) => {

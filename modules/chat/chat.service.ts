@@ -224,9 +224,9 @@ A data e hora atual do sistema (hoje) é: ${systemDateStr} (Horário de Brasíli
 
 INSTRUÇÕES CRICIAIS DE FORMATAÇÃO E RESPOSTA:
 1. Responda em português de forma clara, amigável e objetiva. Use negritos, listas e títulos curtos.
-2. Quando mencionar ou citar uma nota ou arquivo PDF específico que exista nas listas de contexto, você DEVE criar um link em formato markdown para o usuário poder clicar e abri-lo:
-   - Para Notas ou PDFs: [Título da Nota](/hub/notes/ID_DA_NOTA)
-   - Exemplo: "Você pode ler mais sobre isso no seu resumo [Aula de Bioquímica](/hub/notes/note_123)."
+2. Quando mencionar ou citar uma nota, arquivo PDF ou planilha Excel específico que exista nas listas de contexto, você DEVE criar um link em formato markdown para o usuário poder clicar e abri-lo:
+   - Para Notas, PDFs ou Planilhas: [Título](/hub/notes/ID)
+   - Exemplo: "Você pode conferir os valores na planilha [Gastos Mensais](/hub/notes/note_123)."
 3. Quando mencionar uma tarefa específica que exista nas listas de contexto, você DEVE criar um link em formato markdown apontando para o painel de tarefas com o id correspondente:
    - Para Tarefas: [Título da Tarefa](/hub/tasks?taskId=ID_DA_TAREFA)
    - Exemplo: "Vi que a tarefa [Comprar Livro](/hub/tasks?taskId=note_456) ainda está pendente."

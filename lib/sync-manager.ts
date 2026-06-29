@@ -133,7 +133,7 @@ class SyncManager {
       title?: string;
       folderId?: string | null;
       parentId?: string | null;
-      type?: "note" | "task" | "pdf";
+      type?: "note" | "task" | "pdf" | "excel";
       taskStatus?: "to_start" | "in_progress" | "done" | null;
       color?: string;
       updates?: Record<string, unknown>;

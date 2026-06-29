@@ -7,6 +7,7 @@ import Link from "next/link";
 import { cn } from "@/lib/utils";
 import { NoteEditorClient } from "./note-editor-client";
 import { redirect } from "next/navigation";
+import { ExcelViewerWrapper } from "./excel-viewer-wrapper";
 
 interface NotePageProps {
   params: Promise<{
@@ -28,6 +29,61 @@ export default async function NotePage({ params }: NotePageProps) {
   const backHref = note.folderId
     ? `/hub/notes/folder/${note.folderId}`
     : "/hub/notes";
+
+  if (note.type === "excel") {
+    return (
+      <div className="flex flex-col h-full min-h-screen pb-10">
+        <Header
+          title={note.title}
+          backHref={backHref}
+          showSubHeader={false}
+          className="contents"
+          user={user}
+        />
+
+        <main className="container flex-1 py-6 flex flex-col gap-6">
+          <div className="flex flex-wrap items-center gap-3">
+            <Link
+              href={backHref}
+              className={cn(
+                buttonVariants({ variant: "outline" }),
+                "flex items-center gap-2 cursor-pointer"
+              )}
+            >
+              <ArrowLeft className="size-4" />
+              Voltar
+            </Link>
+
+            {note.fileUrl && (
+              <a
+                href={note.fileUrl}
+                download={note.title}
+                target="_blank"
+                rel="noreferrer"
+                className={cn(
+                  buttonVariants({ variant: "default" }),
+                  "flex items-center gap-2 cursor-pointer bg-primary text-primary-foreground hover:bg-primary/95"
+                )}
+              >
+                <Download className="size-4" />
+                Baixar Planilha
+              </a>
+            )}
+          </div>
+
+          {note.fileUrl ? (
+            <ExcelViewerWrapper fileUrl={note.fileUrl} noteId={note.id} />
+          ) : (
+            <div className="flex flex-col items-center justify-center p-12 text-center border border-dashed border-border/60 rounded-2xl bg-muted/5">
+              <FileText className="size-12 text-muted-foreground/60 mb-3" />
+              <h3 className="text-base font-bold text-foreground">Arquivo ausente</h3>
+              <p className="text-sm text-muted-foreground mt-1">Esta planilha não possui um link de arquivo válido.</p>
+            </div>
+          )}
+        </main>
+      </div>
+    );
+  }
 
   if (note.type === "pdf") {
     return (

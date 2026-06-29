@@ -834,7 +834,7 @@ export function NotesDashboard({
           onOpenTasksSidebar={() => setSidebarOpen(true)}
           onNoteCreatedOffline={(newNote) => {
             setLocalNotes((curr) => [newNote, ...curr]);
-            if (newNote.type === "note" || newNote.type === "pdf") {
+            if (newNote.type === "note" || newNote.type === "pdf" || newNote.type === "excel") {
               setEditingNote(newNote);
               setNoteVaultOpen(true);
             }

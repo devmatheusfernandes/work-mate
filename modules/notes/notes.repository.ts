@@ -18,7 +18,7 @@ type TagFromDb = typeof tagsTable.$inferSelect;
 function mapNoteFromDb(note: NoteFromDb): Note {
   return {
     ...note,
-    type: note.type as "note" | "pdf" | "task",
+    type: note.type as "note" | "pdf" | "task" | "excel",
     taskStatus: note.taskStatus as "to_start" | "in_progress" | "done" | null | undefined,
     createdAt: note.createdAt instanceof Date ? note.createdAt.toISOString() : (note.createdAt as string),
     updatedAt: note.updatedAt instanceof Date ? note.updatedAt.toISOString() : (note.updatedAt as string),

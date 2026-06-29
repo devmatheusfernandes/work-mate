@@ -49,7 +49,7 @@ const LABELS: Record<string, string> = {
   task:          "Nova tarefa",
   folder:        "Nova pasta",
   tag:           "Tags",
-  pdf:           "Subir PDF",
+  pdf:           "Subir arquivo",
   chat:          "Assistente IA",
   calendar:      "Abrir agenda",
   tasks_sidebar: "Abrir tarefas",
@@ -204,7 +204,7 @@ export function CreateButton({
         type="file"
         ref={fileInputRef}
         onChange={handleFileChange}
-        accept="application/pdf"
+        accept="application/pdf, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, application/vnd.ms-excel, text/csv"
         className="hidden"
       />
 

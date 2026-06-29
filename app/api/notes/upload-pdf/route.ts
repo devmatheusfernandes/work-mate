@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/safe-action";
 import { notesStorageService } from "@/modules/notes/notes-storage.service";
 import { notesService } from "@/modules/notes/notes.service";
+// pdf-parse é CJS puro; require() evita o resolver ESM que não tem default export
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const pdfParse = require("pdf-parse") as (buffer: Buffer) => Promise<{ text: string; numpages: number; info: Record<string, unknown> }>;
 
 export async function POST(req: NextRequest) {
   try {
@@ -16,7 +19,6 @@ export async function POST(req: NextRequest) {
     const file = formData.get("file") as File | null;
     const title = formData.get("title") as string | null;
     const folderId = formData.get("folderId") as string | null;
-    const searchText = formData.get("searchText") as string | null; // Texto extraído do PDF no client-side
 
     if (!file) {
       return NextResponse.json({ error: "Nenhum arquivo enviado" }, { status: 400 });
@@ -38,7 +40,18 @@ export async function POST(req: NextRequest) {
     const arrayBuffer = await file.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
 
-    // Fazer upload para o Supabase Storage
+    // 4. Extrair texto do PDF server-side para indexação semântica
+    let extractedText = "";
+    try {
+      const pdfData = await pdfParse(buffer);
+      // Limita a 50.000 caracteres para não exceder limites do modelo de embedding
+      extractedText = pdfData.text.trim().slice(0, 50_000);
+    } catch (parseError) {
+      console.warn("Não foi possível extrair texto do PDF (pode ser escaneado/imagem):", parseError);
+      // Continua sem texto: o PDF ainda é salvo, mas sem busca semântica por conteúdo
+    }
+
+    // 5. Fazer upload para o Supabase Storage
     const { fileUrl } = await notesStorageService.uploadPdf(
       user.id,
       noteId,
@@ -48,14 +61,14 @@ export async function POST(req: NextRequest) {
       fileBytes
     );
 
-    // 4. Salvar a nota de PDF no banco via notesService (que também enfileirará na vetorização)
+    // 6. Salvar a nota de PDF no banco via notesService (que também vetorizará imediatamente)
     const note = await notesService.createNote(user.id, {
       title: title || file.name.replace(/\.pdf$/i, ""),
       folderId: folderId || null,
       type: "pdf",
       fileUrl: fileUrl,
       fileSize: fileBytes,
-      searchText: searchText || "", // O texto será indexado e vetorizado de forma assíncrona
+      searchText: extractedText, // Texto real do PDF — indexado e vetorizado no createNote
       archived: false,
       trashed: false,
       isLocked: false,
@@ -72,3 +85,4 @@ export async function POST(req: NextRequest) {
     );
   }
 }
+

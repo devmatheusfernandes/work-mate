@@ -3,7 +3,7 @@ import { notesStorageService } from "./notes-storage.service";
 import { Note, Folder, Tag, CreateNoteDTO, CreateFolderDTO, CreateTagDTO } from "./notes.schema";
 import { vectorService } from "../vector/vector.service";
 
-type NoteSourceType = "note" | "pdf" | "task";
+type NoteSourceType = "note" | "pdf" | "task" | "excel";
 
 function getContentToEmbed(note: Note): string {
   const bodyText = note.searchText || "";
@@ -28,6 +28,8 @@ function getContentToEmbed(note: Note): string {
     }
   } else if (note.type === "pdf") {
     text += `\nTipo: Documento PDF`;
+  } else if (note.type === "excel") {
+    text += `\nTipo: Planilha Excel`;
   } else {
     text += `\nTipo: Nota de Texto`;
   }
