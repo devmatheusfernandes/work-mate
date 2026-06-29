@@ -4,6 +4,7 @@ import { useState, useCallback, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
 import { updateNoteAction } from "@/modules/notes/notes.actions";
+import { notifyTaskUpdate } from "@/modules/notes/tasks.store";
 import {
   CircleDashed,
   Loader2,
@@ -142,6 +143,8 @@ export function TaskDetailsVault({
     if (task.id.startsWith("temp_")) {
       return; // Hold edits in local state
     }
+    // Notify store and sidebar immediately (optimistic)
+    notifyTaskUpdate(task.id, updates);
     try {
       const result = await updateNoteAction({
         id: task.id,

@@ -9,6 +9,7 @@ import { useCalendarStore } from "@/modules/calendar/calendar.store";
 import { createNoteAction } from "@/modules/notes/notes.actions";
 import { Note, TaskStatus } from "@/modules/notes/notes.schema";
 import { saveOfflineItem } from "@/lib/offline-db";
+import { useTasksStore } from "@/modules/notes/tasks.store";
 
 interface UseCreateButtonProps {
   activeFolderId: string | null;
@@ -16,7 +17,6 @@ interface UseCreateButtonProps {
   onCreateNote?: () => void;
   onCreateTask?: (status: TaskStatus) => void;
   onNoteCreatedOffline?: (note: Note) => void;
-  onOpenTasksSidebar?: () => void;
   setActiveVault: (vault: "folder" | "tag" | null) => void;
 }
 
@@ -26,7 +26,6 @@ export function useCreateButton({
   onCreateNote,
   onCreateTask,
   onNoteCreatedOffline,
-  onOpenTasksSidebar,
   setActiveVault,
 }: UseCreateButtonProps) {
   const router = useRouter();
@@ -402,11 +401,7 @@ export function useCreateButton({
         break;
       case "tasks_sidebar":
         setIsOpenMenu(false);
-        if (onOpenTasksSidebar) {
-          onOpenTasksSidebar();
-        } else {
-          router.push("/hub/tasks");
-        }
+        useTasksStore.getState().setIsOpen(true);
         break;
     }
   };

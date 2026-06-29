@@ -11,6 +11,7 @@ import { Note, Folder, Tag, TaskStatus } from "@/modules/notes/notes.schema";
 import { useCreateButton } from "./use-create-button";
 import { FolderVault } from "./folder-vault";
 import { TagVault } from "./tag-vault";
+import { useTasksStore } from "@/modules/notes/tasks.store";
 
 interface CreateButtonProps {
   activeFolderId: string | null;
@@ -18,9 +19,6 @@ interface CreateButtonProps {
   defaultType?: "note" | "task";
   onCreateNote?: () => void;
   onCreateTask?: (status: TaskStatus) => void;
-  isTasksSidebarOpen?: boolean;
-  isTasksSidebarExpanded?: boolean;
-  onOpenTasksSidebar?: () => void;
   onNoteCreatedOffline?: (note: Note) => void;
   onFolderCreatedOffline?: (folder: Folder) => void;
   onTagCreatedOffline?: (tag: Tag) => void;
@@ -147,9 +145,6 @@ export function CreateButton({
   defaultType = "note",
   onCreateNote,
   onCreateTask,
-  isTasksSidebarOpen = false,
-  isTasksSidebarExpanded = false,
-  onOpenTasksSidebar,
   onNoteCreatedOffline,
   onFolderCreatedOffline,
   onTagCreatedOffline,
@@ -157,6 +152,8 @@ export function CreateButton({
 }: CreateButtonProps) {
   const isChatOpen     = useChatStore((s) => s.isSidebarOpen);
   const isCalendarOpen = useCalendarStore((s) => s.isSidebarOpen);
+  const isTasksSidebarOpen = useTasksStore((s) => s.isOpen);
+  const isTasksSidebarExpanded = useTasksStore((s) => s.isExpanded);
   const { isMobile }   = useDevice();
 
   // Dynamic right offset based on open sidebars
@@ -189,7 +186,6 @@ export function CreateButton({
     onCreateNote,
     onCreateTask,
     onNoteCreatedOffline,
-    onOpenTasksSidebar,
     setActiveVault,
   });
 

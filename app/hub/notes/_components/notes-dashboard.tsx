@@ -10,7 +10,6 @@ import { FolderCard } from "./folder-card";
 import { NoteCard } from "./note-card";
 import { SelectionActionBar } from "./selection-action-bar";
 import { CreateButton } from "./create-button";
-import { TasksSidebar } from "./tasks-sidebar";
 import { Empty, EmptyHeader, EmptyMedia, EmptyTitle, EmptyDescription, EmptyResults } from "@/components/ui/empty";
 import { FileText, KanbanSquare } from "lucide-react";
 import { toast } from "sonner";
@@ -20,6 +19,7 @@ import { SearchBar } from "@/components/ui/search-bar";
 import { saveOfflineItem, getAllOfflineItems, saveOfflineItemsBatch } from "@/lib/offline-db";
 import { NoteDetailsVault } from "./note-details-vault";
 import { cn } from "@/lib/utils";
+import { useTasksStore, subscribeToTaskUpdates } from "@/modules/notes/tasks.store";
 
 interface NotesDashboardProps {
   notes: Note[];
@@ -36,9 +36,8 @@ export function NotesDashboard({
 }: NotesDashboardProps) {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedTagId, setSelectedTagId] = useState<string | null>(null);
-  const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [tasksSidebarExpanded, setTasksSidebarExpanded] = useState(false);
   const { isMobile } = useDevice();
+  const { setTasks } = useTasksStore();
   const [activeTab, setActiveTab] = useState<"notes" | "folders" | "archive">("notes");
 
   const [localNotes, setLocalNotes] = useState(notes);
@@ -75,6 +74,22 @@ export function NotesDashboard({
     }
     syncOfflineData();
   }, [notes, folders, tags]);
+
+  // Keep the global tasks store in sync with the dashboard's localNotes
+  useEffect(() => {
+    const tasks = localNotes.filter((n) => n.type === "task" && !n.archived && !n.trashed);
+    setTasks(tasks);
+  }, [localNotes, setTasks]);
+
+  // Subscribe to task updates from the sidebar or vault and reflect them in localNotes
+  useEffect(() => {
+    const unsubscribe = subscribeToTaskUpdates((id, updates) => {
+      setLocalNotes((current) =>
+        current.map((n) => (n.id === id ? ({ ...n, ...updates } as Note) : n))
+      );
+    });
+    return unsubscribe;
+  }, []);
 
   // Bulk Selection States
   const [selectedNoteIds, setSelectedNoteIds] = useState<Set<string>>(new Set());
@@ -199,10 +214,6 @@ export function NotesDashboard({
     return "/hub/notes";
   }, [activeFolderId, currentFolder]);
 
-  // Separate tasks from notes
-  const allTasks = useMemo(() => {
-    return localNotes.filter((n) => n.type === "task" && !n.archived && !n.trashed);
-  }, [localNotes]);
 
   // Filter folders and notes inside active folder (exclude tasks)
   const displayedFolders = useMemo(() => {
@@ -837,9 +848,6 @@ export function NotesDashboard({
           activeFolderId={activeFolderId} 
           tags={localTags} 
           onCreateNote={handleCreateNote}
-          isTasksSidebarOpen={sidebarOpen}
-          isTasksSidebarExpanded={tasksSidebarExpanded}
-          onOpenTasksSidebar={() => setSidebarOpen(true)}
           onNoteCreatedOffline={(newNote) => {
             setLocalNotes((curr) => [newNote, ...curr]);
             if (newNote.type === "note" || newNote.type === "pdf" || newNote.type === "excel") {
@@ -867,18 +875,6 @@ export function NotesDashboard({
           }}
         />
       </div>
-
-      {/* Tasks Sidebar */}
-      <TasksSidebar
-        tasks={allTasks}
-        isOpen={sidebarOpen}
-        onToggle={() => setSidebarOpen((prev) => !prev)}
-        onDragOverSidebar={() => {
-          if (!sidebarOpen) setSidebarOpen(true);
-        }}
-        onUpdateNoteOptimistic={handleUpdateNoteOptimistic}
-        onExpandedChange={setTasksSidebarExpanded}
-      />
     </div>
   );
 }

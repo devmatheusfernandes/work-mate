@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import {
   CircleDashed,
   Loader2,
@@ -17,19 +17,8 @@ import { TaskDetailsVault } from "./task-details-vault";
 import type { Note, TaskStatus } from "@/modules/notes/notes.schema";
 import { useDevice } from "@/hooks/ui/use-device";
 import { Vault, VaultContent, VaultTitle } from "@/components/ui/vault";
-
-interface TasksSidebarProps {
-  tasks: Note[];
-  isOpen: boolean;
-  onToggle: () => void;
-  onDragOverSidebar: () => void;
-  onUpdateNoteOptimistic: (
-    id: string,
-    updates: Partial<Note>,
-    apiCall: () => Promise<{ data?: { success?: boolean } } | undefined>
-  ) => void;
-  onExpandedChange?: (expanded: boolean) => void;
-}
+import { useTasksStore, subscribeToTaskUpdates } from "@/modules/notes/tasks.store";
+import { usePathname } from "next/navigation";
 
 const LANES: {
   status: TaskStatus;
@@ -143,7 +132,7 @@ function ExpandedTaskCard({
       onDragStart={handleDragStart}
       onClick={onClick}
       className={cn(
-        "w-full p-3 rounded-lg border border-border/40 bg-black cursor-pointer",
+        "w-full p-3 rounded-lg border border-border/40 bg-card cursor-pointer",
         "hover:border-border hover:bg-muted/10 transition-all duration-200",
         "flex flex-col gap-2"
       )}
@@ -182,35 +171,66 @@ function ExpandedTaskCard({
   );
 }
 
-export function TasksSidebar({
-  tasks,
-  isOpen,
-  onToggle,
-  onDragOverSidebar,
-  onUpdateNoteOptimistic,
-  onExpandedChange,
-}: TasksSidebarProps) {
+export function TasksSidebar() {
+  const pathname = usePathname();
   const { isMobile, isStandalone } = useDevice();
   const isMobileOrPwa = isMobile || isStandalone;
 
+  const {
+    tasks,
+    isOpen,
+    isExpanded,
+    setIsOpen,
+    setIsExpanded,
+    fetchTasks,
+    updateTaskOptimistic,
+  } = useTasksStore();
+
   const [expandedLane, setExpandedLaneState] = useState<TaskStatus | null>(null);
-  
-  const setExpandedLane = useCallback((lane: TaskStatus | null) => {
-    setExpandedLaneState(lane);
-    onExpandedChange?.(lane !== null);
-  }, [onExpandedChange]);
+
+  const setExpandedLane = useCallback(
+    (lane: TaskStatus | null) => {
+      setExpandedLaneState(lane);
+      setIsExpanded(lane !== null);
+    },
+    [setIsExpanded]
+  );
 
   const [dragOverLane, setDragOverLane] = useState<TaskStatus | null>(null);
   const [selectedTask, setSelectedTask] = useState<Note | null>(null);
 
-  const tasksByStatus = useCallback(
-    (status: TaskStatus) => tasks.filter((t) => t.taskStatus === status),
-    [tasks]
-  );
+  // Fetch tasks on mount (only if list is empty)
+  useEffect(() => {
+    if (tasks.length === 0) {
+      fetchTasks();
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Subscribe to external updates (from TaskDetailsVault)
+  useEffect(() => {
+    const unsubscribe = subscribeToTaskUpdates((id, updates) => {
+      // If the selected task is updated externally, refresh it
+      setSelectedTask((prev) => {
+        if (prev && prev.id === id) {
+          return { ...prev, ...updates } as Note;
+        }
+        return prev;
+      });
+    });
+    return unsubscribe;
+  }, []);
+
+  // Don't render on the full kanban page
+  if (pathname === "/hub/tasks") {
+    return null;
+  }
+
+  const tasksByStatus = (status: TaskStatus) => tasks.filter((t) => t.taskStatus === status);
 
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
-    onDragOverSidebar();
+    if (!isOpen) setIsOpen(true);
   };
 
   const handleDrop = async (e: React.DragEvent, targetStatus: TaskStatus) => {
@@ -224,7 +244,7 @@ export function TasksSidebar({
     if (!id) return;
 
     if (type === "note") {
-      onUpdateNoteOptimistic(
+      await updateTaskOptimistic(
         id,
         {
           type: "task",
@@ -249,7 +269,7 @@ export function TasksSidebar({
       const existingTask = tasks.find((t) => t.id === id);
       if (existingTask && existingTask.taskStatus === targetStatus) return;
 
-      onUpdateNoteOptimistic(
+      await updateTaskOptimistic(
         id,
         { taskStatus: targetStatus },
         () =>
@@ -261,12 +281,12 @@ export function TasksSidebar({
     }
   };
 
-  const renderLaneTasks = (laneTasks: Note[], laneStatus: TaskStatus, isExpanded: boolean) => {
+  const renderLaneTasks = (laneTasks: Note[], laneStatus: TaskStatus, isExpandedView: boolean) => {
     const elements: React.ReactNode[] = [];
 
     laneTasks.forEach((task) => {
       elements.push(
-        isExpanded ? (
+        isExpandedView ? (
           <motion.div
             key={task.id}
             layout
@@ -294,7 +314,7 @@ export function TasksSidebar({
 
     if (dragOverLane === laneStatus) {
       elements.push(
-        isExpanded ? (
+        isExpandedView ? (
           <motion.div
             key="lane-placeholder"
             layout
@@ -325,8 +345,6 @@ export function TasksSidebar({
     return elements;
   };
 
-  const isExpanded = expandedLane !== null;
-
   const renderSidebarContent = () => {
     return (
       <div className="h-full w-full bg-card overflow-hidden flex flex-col relative">
@@ -346,7 +364,7 @@ export function TasksSidebar({
             </h2>
           )}
           <button
-            onClick={onToggle}
+            onClick={() => setIsOpen(false)}
             className="flex items-center justify-center size-7 rounded-full hover:bg-muted text-muted-foreground transition-colors cursor-pointer"
           >
             <ChevronRight className="size-4" />
@@ -436,7 +454,7 @@ export function TasksSidebar({
   if (isMobileOrPwa) {
     return (
       <>
-        <Vault open={isOpen} onOpenChange={(open) => !open && onToggle()}>
+        <Vault open={isOpen} onOpenChange={(open) => !open && setIsOpen(false)}>
           <VaultContent aria-label="Tarefas" noPadding className="h-[80vh] max-h-[80vh]">
             <VaultTitle className="sr-only">Tarefas</VaultTitle>
             <div className="h-full w-full overflow-hidden">
@@ -462,18 +480,24 @@ export function TasksSidebar({
   return (
     <>
       {/* Toggle Handle */}
-      {!isOpen && (
-        <button
-          onClick={onToggle}
-          onDragOver={(e) => {
-            e.preventDefault();
-            onDragOverSidebar();
-          }}
-          className="fixed right-0 top-1/2 -translate-y-1/2 z-30 flex items-center justify-center w-6 h-16 bg-muted/80 hover:bg-muted border border-r-0 border-border/50 rounded-l-lg transition-all cursor-pointer"
-        >
-          <CheckCircle2 className="size-4 text-primary" />
-        </button>
-      )}
+      <AnimatePresence>
+        {!isOpen && (
+          <motion.button
+            initial={{ x: 50, opacity: 0 }}
+            animate={{ x: 0, opacity: 1 }}
+            exit={{ x: 50, opacity: 0 }}
+            transition={{ type: "spring", stiffness: 300, damping: 25 }}
+            onClick={() => setIsOpen(true)}
+            onDragOver={(e) => {
+              e.preventDefault();
+              setIsOpen(true);
+            }}
+            className="fixed right-0 top-1/2 -translate-y-1/2 z-30 flex items-center justify-center w-6 h-16 bg-muted/80 hover:bg-muted border border-r-0 border-border/50 rounded-l-lg transition-all cursor-pointer"
+          >
+            <CheckCircle2 className="size-4 text-primary" />
+          </motion.button>
+        )}
+      </AnimatePresence>
 
       {/* Sidebar Panel */}
       <AnimatePresence>
@@ -489,7 +513,7 @@ export function TasksSidebar({
             className="relative h-full overflow-hidden shrink-0"
             onDragOver={handleDragOver}
           >
-            <div className="h-full w-full">
+            <div className="h-full w-full pl-[2px] py-2 pr-2">
               <div className={cn(
                 "h-full bg-card rounded-xl overflow-hidden flex flex-col relative border border-border/20",
                 isExpanded ? "w-[470px]" : "w-full"
