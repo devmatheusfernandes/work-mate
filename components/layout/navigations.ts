@@ -1,10 +1,10 @@
 import {
-  User,
-  CheckSquare,
+  StickyNote,
+  Archive,
   Settings,
   Trash,
-  MessageSquare,
-  KanbanSquare,
+  MessageCircle,
+  ListTodo,
 } from "lucide-react";
 import { MenuItemType } from "./types";
 
@@ -12,22 +12,22 @@ export const sidebarNavItems: MenuItemType[] = [
   {
     href: "/hub/notes",
     label: "Notas",
-    Icon: User,
+    Icon: StickyNote,
   },
   {
     href: "/hub/archive",
     label: "Arquivadas",
-    Icon: CheckSquare,
+    Icon: Archive,
   },
   {
     href: "/hub/chat",
     label: "Conversas",
-    Icon: MessageSquare,
+    Icon: MessageCircle,
   },
   {
     href: "/hub/tasks",
     label: "Tarefas",
-    Icon: KanbanSquare,
+    Icon: ListTodo,
   },
   {
     href: "/hub/settings",

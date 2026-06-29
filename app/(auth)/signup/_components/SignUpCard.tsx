@@ -10,8 +10,10 @@ import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import Link from "next/link";
 import { Eye, EyeOff, Lock, Mail, Check, X } from "lucide-react";
+import { useRouter } from "next/navigation";
 
 export function SignUpCard() {
+  const router = useRouter();
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -57,6 +59,7 @@ export function SignUpCard() {
           toast.success(result.data.message);
         } else {
           toast.success("Cadastro efetuado com sucesso!");
+          router.push("/hub");
         }
       } else {
         toast.error(result?.data?.error || "Falha ao cadastrar.");
@@ -203,7 +206,7 @@ export function SignUpCard() {
           type="submit"
           isLoading={isLoading}
           fullWidth
-          className="bg-blue-600 hover:bg-blue-500 text-white font-medium h-11 active:scale-[0.98] transition-transform rounded-md flex items-center justify-center cursor-pointer mt-6"
+          className="bg-blue-600 hover:bg-blue-500 text-white font-medium h-11 rounded-md flex items-center justify-center cursor-pointer mt-6"
         >
           Cadastrar
         </Button>

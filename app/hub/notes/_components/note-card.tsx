@@ -184,6 +184,79 @@ export function NoteCard({
     }
   };
 
+  const handleToggleSubtask = async (e: React.MouseEvent | React.ChangeEvent, subtaskId: string) => {
+    e.stopPropagation();
+    if (!note.taskSubtasks) return;
+    
+    const newSubtasks = note.taskSubtasks.map(t => 
+      t.id === subtaskId ? { ...t, completed: !t.completed } : t
+    );
+    
+    onUpdateNote?.(note.id, { taskSubtasks: newSubtasks });
+    
+    try {
+      await updateNoteAction({ id: note.id, updates: { taskSubtasks: newSubtasks } });
+    } catch {
+      toast.error("Erro ao atualizar tarefa.");
+      onUpdateNote?.(note.id, { taskSubtasks: note.taskSubtasks });
+    }
+  };
+
+  const extractTiptapTasks = (html?: string) => {
+    if (!html) return [];
+    const tasks: { index: number, completed: boolean, title: string }[] = [];
+    const regex = /<li\b[^>]*data-type="taskItem"[^>]*>([\s\S]*?)<\/li>/gi;
+    let match;
+    let index = 0;
+    while ((match = regex.exec(html)) !== null) {
+      const fullMatch = match[0];
+      const isChecked = /data-checked="true"/i.test(fullMatch);
+      const innerHtml = match[1];
+      const text = innerHtml.replace(/<[^>]*>?/gm, '').trim();
+      tasks.push({ index, completed: isChecked, title: text });
+      index++;
+    }
+    return tasks;
+  };
+
+  const handleToggleTiptapTask = async (e: React.MouseEvent | React.ChangeEvent, taskIndex: number) => {
+    e.stopPropagation();
+    if (!note.content || typeof window === 'undefined') return;
+
+    try {
+      const doc = new DOMParser().parseFromString(note.content, "text/html");
+      const items = Array.from(doc.querySelectorAll('li[data-type="taskItem"]'));
+      
+      if (items[taskIndex]) {
+        const li = items[taskIndex];
+        const isChecked = li.getAttribute('data-checked') === 'true';
+        const nextState = !isChecked;
+        
+        // Update data-checked attribute on the li
+        li.setAttribute('data-checked', String(nextState));
+        
+        // Find the checkbox input and update its attribute
+        const checkbox = li.querySelector('input[type="checkbox"]');
+        if (checkbox) {
+          if (nextState) {
+            checkbox.setAttribute('checked', 'checked');
+          } else {
+            checkbox.removeAttribute('checked');
+          }
+        }
+        
+        // Serialize back to HTML string
+        const newContent = doc.body.innerHTML;
+        
+        onUpdateNote?.(note.id, { content: newContent });
+        await updateNoteAction({ id: note.id, updates: { content: newContent } });
+      }
+    } catch {
+      toast.error("Erro ao atualizar tarefa.");
+      onUpdateNote?.(note.id, { content: note.content });
+    }
+  };
+
   const handleEmbedNow = async (e: React.MouseEvent) => {
     e.stopPropagation();
     const toastId = toast.loading("Vetorizando nota com Gemini...");
@@ -230,7 +303,20 @@ export function NoteCard({
     return date.toLocaleDateString("pt-BR", options).toUpperCase().replace(/\./g, "");
   };
 
-  const previewText = note.searchText || "Sem conteúdo...";
+  const stripHtml = (html?: string) => {
+    if (!html) return "";
+    return html.replace(/<[^>]*>?/gm, '').trim();
+  };
+
+  const previewText = note.searchText || stripHtml(note.content) || "Sem conteúdo...";
+
+  const getFirstImage = (content?: string) => {
+    if (!content) return null;
+    const match = content.match(/<img[^>]+src="([^">]+)"/);
+    return match ? match[1] : null;
+  };
+  const firstImage = getFirstImage(note.content);
+  const tiptapTasks = extractTiptapTasks(note.content);
 
   const isRealVectorized = !!(note.isVectorized && (
     note.type === "task" ||
@@ -244,7 +330,7 @@ export function NoteCard({
       onDragStart={handleDragStart}
       onClick={handleClick}
       className={cn(
-        "group relative flex flex-col justify-between overflow-hidden rounded-2xl transition-all duration-300 cursor-pointer min-h-[160px] p-4 text-left border shadow-none",
+        "group relative flex flex-col justify-between overflow-hidden rounded-2xl transition-all duration-300 cursor-pointer min-h-[160px] text-left border shadow-none",
         isSelected
           ? "border-primary/50 bg-primary/5"
           : note.pinned
@@ -252,6 +338,14 @@ export function NoteCard({
           : "border-border/50 bg-card hover:border-border"
       )}
     >
+      {firstImage && !note.isLocked && (
+        <div className="w-full h-32 bg-muted relative overflow-hidden shrink-0">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={firstImage} alt="Preview" className="w-full h-full object-cover" />
+        </div>
+      )}
+
+      <div className="p-4 flex flex-col flex-1">
       {/* Selection Circle */}
       <div
         onClick={(e) => {
@@ -474,19 +568,20 @@ export function NoteCard({
                 note.pinned ? "text-blue-100" : "text-muted-foreground/90"
               )}>
                 {note.taskSubtasks.slice(0, 3).map((subtask) => (
-                  <li key={subtask.id} className="flex items-center gap-1.5">
+                  <li key={subtask.id} className="flex items-center gap-1.5" onClick={(e) => handleToggleSubtask(e, subtask.id)}>
                     <input
                       type="checkbox"
                       checked={subtask.completed}
-                      readOnly
+                      onChange={(e) => handleToggleSubtask(e, subtask.id)}
+                      onClick={(e) => e.stopPropagation()}
                       className={cn(
-                        "size-3.5 rounded focus:ring-0 pointer-events-none shrink-0",
+                        "size-3.5 rounded focus:ring-0 shrink-0 cursor-pointer",
                         note.pinned 
                           ? "border-white/30 bg-white/10 text-white checked:bg-white checked:border-white" 
                           : "border-muted-foreground/30 text-primary"
                       )}
                     />
-                    <span className={cn("truncate", subtask.completed && (note.pinned ? "line-through text-white/50" : "line-through text-muted-foreground/45"))}>
+                    <span className={cn("truncate cursor-pointer", subtask.completed && (note.pinned ? "line-through text-white/50" : "line-through text-muted-foreground/45"))}>
                       {subtask.title}
                     </span>
                   </li>
@@ -497,6 +592,39 @@ export function NoteCard({
                     note.pinned ? "text-white/60" : "text-muted-foreground/50"
                   )}>
                     + {note.taskSubtasks.length - 3} itens
+                  </li>
+                )}
+              </ul>
+            ) : tiptapTasks.length > 0 ? (
+              <ul className={cn(
+                "mt-3 space-y-1.5 text-[11px] font-medium",
+                note.pinned ? "text-blue-100" : "text-muted-foreground/90"
+              )}>
+                {tiptapTasks.slice(0, 3).map((task) => (
+                  <li key={task.index} className="flex items-center gap-1.5" onClick={(e) => handleToggleTiptapTask(e, task.index)}>
+                    <input
+                      type="checkbox"
+                      checked={task.completed}
+                      onChange={(e) => handleToggleTiptapTask(e, task.index)}
+                      onClick={(e) => e.stopPropagation()}
+                      className={cn(
+                        "size-3.5 rounded focus:ring-0 shrink-0 cursor-pointer",
+                        note.pinned 
+                          ? "border-white/30 bg-white/10 text-white checked:bg-white checked:border-white" 
+                          : "border-muted-foreground/30 text-primary"
+                      )}
+                    />
+                    <span className={cn("truncate cursor-pointer", task.completed && (note.pinned ? "line-through text-white/50" : "line-through text-muted-foreground/45"))}>
+                      {task.title || "Tarefa"}
+                    </span>
+                  </li>
+                ))}
+                {tiptapTasks.length > 3 && (
+                  <li className={cn(
+                    "text-[9px] pl-5 font-bold tracking-wider uppercase",
+                    note.pinned ? "text-white/60" : "text-muted-foreground/50"
+                  )}>
+                    + {tiptapTasks.length - 3} itens
                   </li>
                 )}
               </ul>
@@ -521,6 +649,7 @@ export function NoteCard({
           <span>{formatFriendlyDate(note.createdAt)}</span>
         </div>
         {note.pinned && <Pin className="size-3 text-white fill-white/10" />}
+      </div>
       </div>
     </article>
 

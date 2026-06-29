@@ -11,7 +11,6 @@ import { Button, buttonVariants } from "@/components/ui/button";
 import { SidebarTrigger } from "./sidebar-trigger";
 import { Input } from "@/components/ui/input";
 import { ThemeSwitcher } from "../ui/theme-switcher";
-import { NotificationBell } from "@/modules/notification/_components/NotificationBell";
 import { SearchBar } from "../ui/search-bar";
 import { useDebounce } from "@/hooks/common/use-debounce";
 import { useUserStore } from "@/modules/user/user.store";
@@ -135,7 +134,7 @@ const Header = React.forwardRef<HTMLDivElement, HeaderProps>(({
     return (
         <div ref={ref} className={cn("w-full flex flex-col", className)} {...props}>
             {showHeader && (
-                <header className="header-layout sticky top-0 z-40 flex h-12 w-full items-center justify-between px-4 md:px-6">
+                <header className="header-layout sticky top-0 z-40 flex h-12 w-full items-center justify-around px-2 pt-1">
                     <AnimatePresence mode="wait">
                         {isMobileOrPwa && isSearchOpen ? (
                             <motion.div
@@ -206,7 +205,6 @@ const Header = React.forwardRef<HTMLDivElement, HeaderProps>(({
                                             )}
                                             {renderActions(true)}
                                             <ThemeSwitcher />
-                                            <NotificationBell />
                                             {displayUser && <UserMenu user={displayUser} />}
                                         </>
                                     ) : (
@@ -224,7 +222,6 @@ const Header = React.forwardRef<HTMLDivElement, HeaderProps>(({
                                                 </Button>
                                             ))}
                                             <ThemeSwitcher />
-                                            <NotificationBell />
                                             {displayUser && <UserMenu user={displayUser} />}
                                         </>
                                     )}

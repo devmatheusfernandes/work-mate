@@ -10,8 +10,10 @@ import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import Link from "next/link";
 import { Eye, EyeOff, Lock, Mail } from "lucide-react";
+import { useRouter } from "next/navigation";
 
 export function SignInCard() {
+  const router = useRouter();
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
@@ -36,7 +38,7 @@ export function SignInCard() {
 
       if (result?.data?.success) {
         toast.success("Login efetuado com sucesso!");
-        //window.location.href = "/hub/profile";
+        router.push("/hub");
       } else {
         toast.error(result?.data?.error || "E-mail ou senha incorretos.");
       }
@@ -115,7 +117,7 @@ export function SignInCard() {
           type="submit"
           isLoading={isLoading}
           fullWidth
-          className="bg-blue-600 hover:bg-blue-500 text-white font-medium h-11 active:scale-[0.98] transition-transform rounded-md flex items-center justify-center cursor-pointer mt-6"
+          className="bg-blue-600 hover:bg-blue-500 text-white font-medium h-11 rounded-md flex items-center justify-center cursor-pointer mt-6"
         >
           Entrar
         </Button>
