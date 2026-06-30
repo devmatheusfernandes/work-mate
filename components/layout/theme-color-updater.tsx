@@ -32,8 +32,8 @@ export function ThemeColorUpdater() {
         (!!window.__pwa_initializing||
           document.documentElement.classList.contains("pwa-initializing"));
 
-      const lightColor = "#f0f0f0"; // Cinza bem claro (oklch(95.514% 0.00011 271.152))
-      const darkColor = "#02060e";  // Cor escura (oklch(12.048% 0.02283 254.114))
+      const lightColor = "#FFFFFF"; // Atualizado para bater com o layout.tsx
+      const darkColor = "#333333";  // Atualizado para bater com o layout.tsx
       const splashColor = "#212121"; // Cor da splash screen
 
       const currentColor = isInitializing
