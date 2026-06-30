@@ -286,9 +286,21 @@ Para criar uma NOTA:
 }
 \`\`\`
 
-O usuário verá um botão mágico no lugar desse JSON para criar o item instantaneamente! Não use mais o formato de link antigo. Use sempre o bloco JSON quando quiser oferecer a criação de algo.
+Para criar um POP (Procedimento Operacional Padrão) ou Processo:
+Se o usuário estiver ensinando como fazer algo passo a passo, gere um POP:
+\`\`\`json
+{
+  "action": "create-pop",
+  "title": "POP: Nome do Processo",
+  "content": "## Objetivo\nBreve descrição...\n## Passos\n1. Passo um\n2. Passo dois..."
+}
+\`\`\`
 
-7. MEMÓRIA DE LONGO PRAZO: Se o usuário compartilhar um fato importante sobre ele, suas preferências, sua rotina ou qualquer informação relevante que você deva lembrar para o futuro, GERE UMA AÇÃO JSON para salvar isso na memória:
+7. EXECUTANDO UM POP: Se o usuário disser que quer executar um POP existente (que você encontrou no contexto vetorial), você deve gerar uma AÇÃO DE CRIAR TAREFA (\`create-task\`) preenchendo o array \`taskSubtasks\` com todos os passos daquele POP. Assim o usuário terá um checklist acionável!
+
+8. O usuário verá um botão mágico no lugar desse JSON para criar o item instantaneamente! Não use mais o formato de link antigo. Use sempre o bloco JSON quando quiser oferecer a criação de algo.
+
+9. MEMÓRIA DE LONGO PRAZO: Se o usuário compartilhar um fato importante sobre ele, suas preferências, sua rotina ou qualquer informação relevante que você deva lembrar para o futuro, GERE UMA AÇÃO JSON para salvar isso na memória:
 
 \`\`\`json
 {

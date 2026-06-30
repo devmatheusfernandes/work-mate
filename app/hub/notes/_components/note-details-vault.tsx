@@ -2,9 +2,11 @@
 
 import { useEffect, useRef, useState } from "react";
 import { SimpleEditor } from "@/components/tiptap-templates/simple/simple-editor";
-import { updateNoteAction } from "@/modules/notes/notes.actions";
+import { updateNoteAction, createNoteAction } from "@/modules/notes/notes.actions";
 import { Note } from "@/modules/notes/notes.schema";
-import { Loader2, CheckCircle2, AlertCircle } from "lucide-react";
+import { Loader2, CheckCircle2, AlertCircle, Play } from "lucide-react";
+import { toast } from "sonner";
+import { Button } from "@/components/ui/button";
 import { saveOfflineItem } from "@/lib/offline-db";
 import {
   Vault,
@@ -148,6 +150,40 @@ export function NoteDetailsVault({
     triggerSave({ title: newTitle });
   };
 
+  const handleExecutePop = async () => {
+    if (!note) return;
+    const lines = noteContent.split('\n');
+    const subtaskTitles = lines
+      .filter((l: string) => /^\s*(\d+\.|-|\*)\s+/.test(l))
+      .map((l: string) => l.replace(/^\s*(\d+\.|-|\*)\s+/, '').trim())
+      .filter((l: string) => l.length > 0);
+
+    const subtasks = subtaskTitles.map((title: string) => ({
+      id: Math.random().toString(36).substring(2, 11),
+      title,
+      completed: false
+    }));
+
+    toast.promise(
+      createNoteAction({
+        title: `[Execução] ${noteTitle}`,
+        type: "task",
+        taskSubtasks: subtasks,
+      }),
+      {
+        loading: "Criando tarefa a partir do POP...",
+        success: (res) => {
+          if (res?.data?.success) {
+            onOpenChange(false); // Close vault
+            return "Tarefa criada com sucesso! Acesse o Kanban para executar.";
+          }
+          throw new Error("Erro ao criar");
+        },
+        error: "Falha ao executar POP",
+      }
+    );
+  };
+
   return (
     <Vault open={open} onOpenChange={onOpenChange} >
       <VaultContent showHandle={false} noPadding className="max-w-4xl h-[90vh] md:h-[85vh] overflow-hidden" aria-label="Editar Nota">
@@ -161,6 +197,15 @@ export function NoteDetailsVault({
               onTitleChange={handleTitleChange}
             />
           </div>
+
+          {/* Botão de Executar POP */}
+          {note.type === "pop" && (
+            <div className="absolute top-4 right-4 z-[100]">
+              <Button onClick={handleExecutePop} size="sm" className="shadow-lg rounded-full cursor-pointer">
+                <Play className="mr-2 h-4 w-4" /> Executar POP
+              </Button>
+            </div>
+          )}
 
           {/* Synchronization status indicator */}
           <div className="absolute bottom-4 right-4 flex items-center gap-2 rounded-full border border-border/60 bg-card/80 px-3 py-1.5 text-[11px] font-semibold shadow-md backdrop-blur-md z-[100]">

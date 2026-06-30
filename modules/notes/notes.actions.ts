@@ -37,7 +37,7 @@ export const updateNoteAction = protectedAction
         pinned: z.boolean().optional(),
         fileUrl: z.string().optional().nullable(),
         isLocked: z.boolean().optional(),
-        type: z.enum(["note", "pdf", "task", "excel"]).optional(),
+        type: z.enum(["note", "pdf", "task", "excel", "pop"]).optional(),
         taskStatus: taskStatusEnum.nullable().optional(),
         taskDeadline: z.string().nullable().optional(),
         taskSubtasks: z.array(subtaskSchema).optional(),

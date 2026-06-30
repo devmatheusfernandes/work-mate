@@ -89,7 +89,7 @@ export const noteSchema = z.object({
   pinned: z.boolean().default(false),
   createdAt: z.string(),
   updatedAt: z.string(),
-  type: z.enum(["note", "pdf", "task", "excel"]).default("note"),
+  type: z.enum(["note", "pdf", "task", "excel", "pop"]).default("note"),
   fileUrl: z.string().optional().nullable(),
   fileSize: z.number().optional().nullable(),
   isLocked: z.boolean().default(false),
@@ -111,7 +111,7 @@ export const createNoteSchema = noteSchema.omit({
 }).extend({
   title: z.string().min(1, "O título não pode ser vazio").max(150, "O título é muito longo").optional(),
   folderId: z.string().optional().nullable(),
-  type: z.enum(["note", "pdf", "task", "excel"]).optional(),
+  type: z.enum(["note", "pdf", "task", "excel", "pop"]).optional(),
   taskStatus: taskStatusEnum.nullable().optional(),
   taskDeadline: z.string().nullable().optional(),
   taskSubtasks: z.array(subtaskSchema).optional(),
@@ -157,7 +157,7 @@ export const notesTable = pgTable("notes", {
   pinned: boolean("pinned").notNull().default(false),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
-  type: text("type").notNull().default("note"), // 'note' | 'pdf' | 'task'
+  type: text("type").notNull().default("note"), // 'note' | 'pdf' | 'task' | 'excel' | 'pop'
   fileUrl: text("file_url"),
   fileSize: integer("file_size"),
   isLocked: boolean("is_locked").notNull().default(false),

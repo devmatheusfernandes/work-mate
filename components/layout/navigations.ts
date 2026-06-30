@@ -4,6 +4,7 @@ import {
   Trash,
   MessageCircle,
   ListTodo,
+  BookOpen,
 } from "lucide-react";
 import { MenuItemType } from "./types";
 
@@ -22,6 +23,11 @@ export const sidebarNavItems: MenuItemType[] = [
     href: "/hub/tasks",
     label: "Tarefas",
     Icon: ListTodo,
+  },
+  {
+    href: "/hub/pops",
+    label: "Processos",
+    Icon: BookOpen,
   },
   {
     href: "/hub/settings",

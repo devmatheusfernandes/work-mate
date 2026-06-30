@@ -414,7 +414,7 @@ export function ChatInterface({
   };
 
   const handleAdvancedQuickCreate = async (data: {
-    action: "create-task" | "create-note";
+    action: "create-task" | "create-note" | "create-pop";
     title?: string;
     content?: string;
     taskDeadline?: string;
@@ -426,8 +426,9 @@ export function ChatInterface({
     setCreatingActions(prev => new Set(prev).add(actionKey));
 
     const isTask = data.action === "create-task";
-    const type = isTask ? "task" : "note";
-    const title = data.title || (isTask ? "Nova Tarefa" : "Nova Nota");
+    const isPop = data.action === "create-pop";
+    const type = isTask ? "task" : isPop ? "pop" : "note";
+    const title = data.title || (isTask ? "Nova Tarefa" : isPop ? "Novo POP" : "Nova Nota");
     
     // Convert array of strings into proper subtask objects
     const formattedSubtasks = isTask && Array.isArray(data.taskSubtasks) 
@@ -452,7 +453,7 @@ export function ChatInterface({
         tagIds: []
       }),
       {
-        loading: `Criando ${type === "task" ? "tarefa" : "nota"}...`,
+        loading: `Criando ${type === "task" ? "tarefa" : type === "pop" ? "POP" : "nota"}...`,
         success: (res) => {
            setCreatingActions(prev => {
              const next = new Set(prev);
@@ -566,9 +567,10 @@ export function ChatInterface({
             );
           }
 
-          if (data.action === "create-task" || data.action === "create-note") {
+          if (data.action === "create-task" || data.action === "create-note" || data.action === "create-pop") {
             const isTask = data.action === "create-task";
-            const title = data.title || (isTask ? "Nova Tarefa" : "Nova Nota");
+            const isPop = data.action === "create-pop";
+            const title = data.title || (isTask ? "Nova Tarefa" : isPop ? "Novo POP" : "Nova Nota");
             const actionKey = JSON.stringify(data);
             const isCreating = creatingActions.has(actionKey);
             const createdNote = createdActions[actionKey];
@@ -577,8 +579,8 @@ export function ChatInterface({
               <div key={index} className="my-3 p-3 bg-primary/5 border border-primary/20 rounded-xl flex flex-col gap-2">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2 text-primary font-medium text-sm">
-                    {isTask ? <CheckSquare className="size-4" /> : <FileText className="size-4" />}
-                    <span>Sugestão de {isTask ? "Tarefa" : "Nota"}: {title}</span>
+                    {isTask ? <CheckSquare className="size-4" /> : isPop ? <FileText className="size-4" /> : <FileText className="size-4" />}
+                    <span>Sugestão de {isTask ? "Tarefa" : isPop ? "POP" : "Nota"}: {title}</span>
                   </div>
                   {createdNote ? (
                     <Button 

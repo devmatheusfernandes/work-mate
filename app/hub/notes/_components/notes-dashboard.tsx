@@ -26,6 +26,7 @@ interface NotesDashboardProps {
   folders: Folder[];
   tags: Tag[];
   activeFolderId: string | null;
+  mode?: "notes" | "pops";
 }
 
 export function NotesDashboard({
@@ -33,6 +34,7 @@ export function NotesDashboard({
   folders,
   tags,
   activeFolderId,
+  mode = "notes",
 }: NotesDashboardProps) {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedTagId, setSelectedTagId] = useState<string | null>(null);
@@ -152,10 +154,10 @@ export function NotesDashboard({
     const tempNote: Note = {
       userId: "local",
       id: tempId,
-      title: "Nova Nota",
+      title: mode === "pops" ? "Novo POP" : "Nova Nota",
       folderId: activeFolderId,
-      type: "note",
-      content: "",
+      type: mode === "pops" ? "pop" : "note",
+      content: mode === "pops" ? "## Objetivo\n\n## Passos\n1. \n2. " : "",
       searchText: "",
       tagIds: [] as string[],
       archived: false,
@@ -176,9 +178,10 @@ export function NotesDashboard({
 
     try {
       const res = await createNoteAction({
-        title: "Nova Nota",
+        title: mode === "pops" ? "Novo POP" : "Nova Nota",
         folderId: activeFolderId,
-        type: "note",
+        type: mode === "pops" ? "pop" : "note",
+        content: mode === "pops" ? "## Objetivo\n\n## Passos\n1. \n2. " : "",
       });
 
       if (res?.data?.success && res.data.note) {
@@ -197,7 +200,7 @@ export function NotesDashboard({
       setNoteVaultOpen(false);
       toast.error("Erro ao criar nota.");
     }
-  }, [activeFolderId]);
+  }, [activeFolderId, mode]);
 
   // Derive current folder details
   const currentFolder = useMemo(() => {
@@ -228,9 +231,9 @@ export function NotesDashboard({
         n.folderId === activeFolderId &&
         !n.archived &&
         !n.trashed &&
-        n.type !== "task"
+        (mode === "pops" ? n.type === "pop" : (n.type !== "task" && n.type !== "pop"))
     );
-  }, [localNotes, activeFolderId]);
+  }, [localNotes, activeFolderId, mode]);
 
   // Filter notes by selected tag
   const tagFilteredNotes = useMemo(() => {
@@ -262,9 +265,9 @@ export function NotesDashboard({
 
   const archivedNotes = useMemo(() => {
     return localNotes.filter(
-      (n) => n.archived && !n.trashed && n.type !== "task"
+      (n) => n.archived && !n.trashed && (mode === "pops" ? n.type === "pop" : (n.type !== "task" && n.type !== "pop"))
     );
-  }, [localNotes]);
+  }, [localNotes, mode]);
 
   const folderPath = useMemo(() => {
     if (!activeFolderId) return [];
@@ -512,7 +515,7 @@ export function NotesDashboard({
       <div className="flex flex-col flex-1 min-w-0 pb-24">
         {/* Header with Search integration */}
         <Header
-          title={currentFolder ? currentFolder.title : "Notas"}
+          title={currentFolder ? currentFolder.title : mode === "pops" ? "Processos (POPs)" : "Notas"}
           className="contents"
           backHref={backHref}
           onSearchChange={isMobile ? setSearchQuery : undefined}
@@ -544,7 +547,7 @@ export function NotesDashboard({
                   activeTab === "notes" ? "text-foreground" : "text-muted-foreground/40"
                 )}
               >
-                Notas
+                {mode === "pops" ? "POPs" : "Notas"}
               </button>
               <span className="text-muted-foreground/30 font-light text-lg select-none">:</span>
               <button
@@ -577,7 +580,7 @@ export function NotesDashboard({
                 href="/hub/notes"
                 className="hover:text-foreground transition-colors font-medium flex items-center gap-1 shrink-0"
               >
-                Notas
+                {mode === "pops" ? "POPs" : "Notas"}
               </Link>
               {folderPath.map((folder, index) => {
                 const isLast = index === folderPath.length - 1;
@@ -615,7 +618,7 @@ export function NotesDashboard({
               <SearchBar
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Buscar notas..."
+                placeholder={mode === "pops" ? "Buscar processos..." : "Buscar notas..."}
               />
             </div>
           </div>
@@ -648,7 +651,7 @@ export function NotesDashboard({
                 {queryFilteredNotes.length > 0 || isDragOverGrid ? (
                   <div className="flex flex-col gap-3">
                     <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground/60">
-                      Notas e Arquivos ({queryFilteredNotes.length + (isDragOverGrid ? 1 : 0)})
+                      {mode === "pops" ? "Processos" : "Notas e Arquivos"} ({queryFilteredNotes.length + (isDragOverGrid ? 1 : 0)})
                     </div>
                     <div className="columns-1 sm:columns-2 md:columns-3 lg:columns-4 gap-4 space-y-4 [column-fill:_balance]">
                       {queryFilteredNotes.map((note) => (
@@ -701,9 +704,9 @@ export function NotesDashboard({
                         <EmptyMedia variant="icon">
                           <FileText className="size-6 text-muted-foreground" />
                         </EmptyMedia>
-                        <EmptyTitle>Nenhuma nota por aqui</EmptyTitle>
+                        <EmptyTitle>{mode === "pops" ? "Nenhum POP por aqui" : "Nenhuma nota por aqui"}</EmptyTitle>
                         <EmptyDescription>
-                          Toque no botão + no canto inferior direito para criar sua primeira nota.
+                          Toque no botão + no canto inferior direito para criar {mode === "pops" ? "seu primeiro processo" : "sua primeira nota"}.
                         </EmptyDescription>
                       </EmptyHeader>
                     </Empty>
@@ -780,7 +783,7 @@ export function NotesDashboard({
                     {queryFilteredArchivedNotes.length > 0 && (
                       <div className="flex flex-col gap-3">
                         <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground/60">
-                          Notas Arquivadas ({queryFilteredArchivedNotes.length})
+                          {mode === "pops" ? "POPs Arquivados" : "Notas Arquivadas"} ({queryFilteredArchivedNotes.length})
                         </div>
                         <div className="columns-1 sm:columns-2 md:columns-3 lg:columns-4 gap-4 space-y-4 [column-fill:_balance]">
                           {queryFilteredArchivedNotes.map((note) => (
