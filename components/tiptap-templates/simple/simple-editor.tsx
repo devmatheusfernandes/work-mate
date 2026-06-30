@@ -22,6 +22,7 @@ import { TableCell } from "@tiptap/extension-table-cell"
 import { TableHeader } from "@tiptap/extension-table-header"
 import { CustomMentionNode } from "@/components/tiptap-node/mention-node/mention-node-extension"
 import { getMentionSuggestionConfig } from "@/components/tiptap-node/mention-node/mention-suggestion"
+import { IndentExtension } from "@/components/tiptap-node/indent-extension/indent-extension"
 
 // --- UI Primitives ---
 import { Button } from "@/components/tiptap-ui-primitive/button"
@@ -284,6 +285,7 @@ export function SimpleEditor({
           enableClickSelection: true,
         },
       }),
+      IndentExtension,
       HorizontalRule,
       TextAlign.configure({ types: ["heading", "paragraph"] }),
       TaskList,
