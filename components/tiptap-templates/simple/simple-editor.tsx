@@ -16,6 +16,8 @@ import { Highlight } from "@tiptap/extension-highlight"
 import { Subscript } from "@tiptap/extension-subscript"
 import { Superscript } from "@tiptap/extension-superscript"
 import { Selection } from "@tiptap/extensions"
+import { CustomMentionNode } from "@/components/tiptap-node/mention-node/mention-node-extension"
+import { getMentionSuggestionConfig } from "@/components/tiptap-node/mention-node/mention-suggestion"
 
 // --- UI Primitives ---
 import { Button } from "@/components/tiptap-ui-primitive/button"
@@ -285,6 +287,12 @@ export function SimpleEditor({
       Superscript,
       Subscript,
       Selection,
+      CustomMentionNode.configure({
+        HTMLAttributes: {
+          class: "mention",
+        },
+        suggestion: getMentionSuggestionConfig(),
+      }),
       ImageUploadNode.configure({
         accept: "image/*",
         maxSize: MAX_FILE_SIZE,

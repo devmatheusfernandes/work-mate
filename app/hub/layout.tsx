@@ -2,6 +2,7 @@ import { Sidebar } from "@/components/layout/sidebar";
 import { ChatSidebar } from "@/components/layout/chat-sidebar";
 import { CalendarSidebar } from "@/components/layout/calendar-sidebar";
 import { TasksSidebar } from "@/app/hub/notes/_components/tasks-sidebar";
+import { MentionsSidebar } from "@/components/layout/mentions-sidebar";
 import { getCurrentUser } from "@/lib/safe-action";
 import { UserStoreInitializer } from "@/components/layout/user-store-initializer";
 
@@ -22,6 +23,7 @@ export default async function HubLayout({ children }: { children: React.ReactNod
       <ChatSidebar />
       <CalendarSidebar />
       <TasksSidebar />
+      <MentionsSidebar />
     </div>
   );
 }

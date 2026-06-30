@@ -67,6 +67,17 @@ export const getNotesAction = protectedAction
     return { success: true, notes };
   });
 
+export const getNoteAction = protectedAction
+  .schema(z.object({ id: z.string() }))
+  .action(async ({ parsedInput, ctx }) => {
+    try {
+      const note = await notesService.getNote(ctx.user.id, parsedInput.id);
+      return { success: true, note };
+    } catch {
+      return { success: false, error: "Nota não encontrada" };
+    }
+  });
+
 // --- Folder Actions ---
 export const createFolderAction = protectedAction
   .schema(createFolderSchema)
@@ -190,4 +201,23 @@ export const embedMultipleNotesNowAction = protectedAction
       console.error("Erro ao vetorizar notas em lote:", e);
       return { success: false, error: e instanceof Error ? e.message : "Erro ao vetorizar notas." };
     }
+  });
+
+export const searchMentionsAction = protectedAction
+  .schema(z.object({ query: z.string() }))
+  .action(async ({ parsedInput, ctx }) => {
+    const allNotes = await notesService.getNotes(ctx.user.id);
+    const query = parsedInput.query.toLowerCase();
+    
+    // Filter active (not trashed) notes and match by title
+    const results = allNotes
+      .filter((n) => !n.trashed && n.title.toLowerCase().includes(query))
+      .map(n => ({
+        id: n.id,
+        title: n.title,
+        type: n.type,
+      }))
+      .slice(0, 10); // Return top 10 matches
+
+    return { success: true, items: results };
   });
