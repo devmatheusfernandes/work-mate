@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import { Note } from "./notes.schema";
-import { getNotesAction, updateNoteAction } from "./notes.actions";
+import { getNotesAction } from "./notes.actions";
 import { getAllOfflineItems, saveOfflineItem } from "@/lib/offline-db";
 import { toast } from "sonner";
 

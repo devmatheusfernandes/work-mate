@@ -3,6 +3,7 @@ import { notesService } from "@/modules/notes/notes.service";
 import { vectorService } from "@/modules/vector/vector.service";
 import { calendarService } from "@/modules/calendar/calendar.service";
 import { memoryService } from "@/modules/memory/memory.service";
+import { encryptText, decryptText } from "@/lib/encryption";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 
 const apiKey = process.env.GEMINI_API_KEY;
@@ -22,7 +23,8 @@ export const chatService = {
     if (!session) {
       throw new Error("Sessão de chat não encontrada ou sem permissão.");
     }
-    return chatRepository.getMessagesBySession(sessionId);
+    const messages = await chatRepository.getMessagesBySession(sessionId);
+    return messages.map(m => ({ ...m, content: decryptText(m.content) }));
   },
 
   async createSession(userId: string, title: string) {
@@ -62,7 +64,8 @@ export const chatService = {
     }
 
     // Fetch conversation history early to inspect for references and construct history
-    const historyMessages = await chatRepository.getMessagesBySession(session.id);
+    const rawHistory = await chatRepository.getMessagesBySession(session.id);
+    const historyMessages = rawHistory.map(m => ({ ...m, content: decryptText(m.content) }));
 
     // 2. Query vector embeddings (RAG)
     let relevantNotesContext = "";
@@ -233,8 +236,10 @@ ${eventsText}`);
       id: userMsgId,
       sessionId: session.id,
       role: "user",
-      content,
+      content: encryptText(content),
     });
+    // Return decrypted content to the client
+    userMessage.content = content;
 
     if (skipAiResponse) {
       return {
@@ -353,12 +358,14 @@ ${relevantNotesContext || "Nenhum conteúdo detalhado adicional relevante encont
       id: assistantMsgId,
       sessionId: session.id,
       role: "assistant",
-      content: replyText,
+      content: encryptText(replyText),
       promptTokens,
       candidatesTokens,
       cost: calculatedCost.toFixed(6),
       precision: maxPrecisionScore > 0 ? maxPrecisionScore.toFixed(2) : null,
     });
+    // Return decrypted content to the client
+    dbMessage.content = replyText;
 
     return {
       message: dbMessage,
@@ -377,16 +384,18 @@ ${relevantNotesContext || "Nenhum conteúdo detalhado adicional relevante encont
       id: userMsgId,
       sessionId: session.id,
       role: "user",
-      content: userText,
+      content: encryptText(userText),
     });
+    userMessage.content = userText;
 
     const assistantMsgId = "msg_" + Math.random().toString(36).substring(2, 11);
     const assistantMessage = await chatRepository.createMessage({
       id: assistantMsgId,
       sessionId: session.id,
       role: "assistant",
-      content: assistantText,
+      content: encryptText(assistantText),
     });
+    assistantMessage.content = assistantText;
 
     return {
       userMessage,
@@ -401,10 +410,11 @@ ${relevantNotesContext || "Nenhum conteúdo detalhado adicional relevante encont
       throw new Error("Sessão não encontrada ou sem permissão.");
     }
     
-    const messages = await chatRepository.getMessagesBySession(sessionId);
-    if (!messages || messages.length === 0) {
+    const rawMessages = await chatRepository.getMessagesBySession(sessionId);
+    if (!rawMessages || rawMessages.length === 0) {
       throw new Error("Não há mensagens nesta conversa para resumir.");
     }
+    const messages = rawMessages.map(m => ({ ...m, content: decryptText(m.content) }));
 
     const chatContent = messages.map(m => `${m.role === 'user' ? 'Usuário' : 'Assistente'}: ${m.content}`).join("\n\n");
 

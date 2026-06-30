@@ -2,6 +2,7 @@ import { notesRepository } from "./notes.repository";
 import { notesStorageService } from "./notes-storage.service";
 import { Note, Folder, Tag, CreateNoteDTO, CreateFolderDTO, CreateTagDTO } from "./notes.schema";
 import { vectorService } from "../vector/vector.service";
+import { encryptText, decryptText } from "@/lib/encryption";
 import https from "https";
 
 type NoteSourceType = "note" | "pdf" | "task" | "excel";
@@ -168,7 +169,12 @@ function extractImageUrls(html: string): string[] {
 export const notesService = {
   // --- Notes Services ---
   async getNotes(userId: string): Promise<Note[]> {
-    const notes = await notesRepository.getNotesByUser(userId);
+    const rawNotes = await notesRepository.getNotesByUser(userId);
+    const notes = rawNotes.map(n => ({
+      ...n,
+      content: decryptText(n.content),
+      searchText: decryptText(n.searchText)
+    }));
     const vectorizedIds = await vectorService.getVectorizedNoteIds(userId);
     return notes.map((note) => ({
       ...note,
@@ -177,10 +183,15 @@ export const notesService = {
   },
   
   async getNote(userId: string, id: string): Promise<Note> {
-    const note = await notesRepository.getNoteById(userId, id);
-    if (!note) {
+    const rawNote = await notesRepository.getNoteById(userId, id);
+    if (!rawNote) {
       throw new Error("Nota não encontrada");
     }
+    const note = {
+      ...rawNote,
+      content: decryptText(rawNote.content),
+      searchText: decryptText(rawNote.searchText)
+    };
     const isVectorized = await vectorService.isNoteVectorized(id);
     return {
       ...note,
@@ -223,7 +234,15 @@ export const notesService = {
       taskShouldNotify: data.taskShouldNotify || false,
     };
     
-    const note = await notesRepository.createNote(userId, newNote);
+    // Encrypt before saving
+    const noteToSave = {
+      ...newNote,
+      content: typeof newNote.content === "string" ? encryptText(newNote.content) : newNote.content,
+      searchText: newNote.searchText ? encryptText(newNote.searchText) : newNote.searchText
+    };
+    
+    await notesRepository.createNote(userId, noteToSave);
+    const note = newNote; // Keep plaintext for logic
 
     let isVectorized = false;
     // Vetoriza de forma imediata (síncrona) para manter RAG atualizado
@@ -242,10 +261,15 @@ export const notesService = {
   },
 
   async updateNote(userId: string, id: string, data: Partial<Note>): Promise<Note> {
-    const note = await notesRepository.getNoteById(userId, id);
-    if (!note) {
+    const rawNote = await notesRepository.getNoteById(userId, id);
+    if (!rawNote) {
       throw new Error("Nota não encontrada");
     }
+    const note = {
+      ...rawNote,
+      content: decryptText(rawNote.content),
+      searchText: decryptText(rawNote.searchText)
+    };
     
     // Auto-update plain text search if content is updated
     if (data.content !== undefined && typeof data.content === "string") {
@@ -293,7 +317,18 @@ export const notesService = {
       (data.taskDeadline !== undefined && data.taskDeadline !== note.taskDeadline) ||
       (data.taskSubtasks !== undefined && JSON.stringify(data.taskSubtasks) !== JSON.stringify(note.taskSubtasks));
 
-    const updatedNote = await notesRepository.updateNote(userId, id, data);
+    const dataToSave = {
+      ...data,
+      content: (data.content !== undefined && typeof data.content === "string") ? encryptText(data.content) : data.content,
+      searchText: data.searchText !== undefined ? encryptText(data.searchText) : data.searchText
+    };
+
+    const updatedRawNote = await notesRepository.updateNote(userId, id, dataToSave);
+    const updatedNote = {
+      ...updatedRawNote,
+      content: decryptText(updatedRawNote.content),
+      searchText: decryptText(updatedRawNote.searchText)
+    };
 
     // Sync images: soft-delete any images no longer present in the content
     if (data.content !== undefined && typeof data.content === "string") {
@@ -491,8 +526,13 @@ export const notesService = {
           extractedText = extractedText.trim().slice(0, 50_000);
         }
 
-        updatedNote = await notesRepository.updateNote(userId, id, {
-          searchText: extractedText,
+        updatedNote = {
+          ...updatedNote,
+          searchText: extractedText
+        };
+
+        await notesRepository.updateNote(userId, id, {
+          searchText: encryptText(extractedText),
         });
       } catch (err) {
         console.error(`Erro ao extrair texto do arquivo ${note.type} durante vetorização manual:`, err);
