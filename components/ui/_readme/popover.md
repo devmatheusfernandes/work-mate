@@ -1,6 +1,6 @@
 # Popover UI Component
 
-O componente `Popover` da FluencyLab é construído sobre o `@base-ui/react/popover`.
+O componente `Popover` da WorkMate é construído sobre o `@base-ui/react/popover`.
 
 ## ⚠️ Limitações do PopoverTrigger
 
@@ -31,6 +31,6 @@ Se você precisar que o trigger seja um componente customizado, você deve:
 
 ## 🚀 Padrão "Vault-First"
 
-**IMPORTANTE:** Para seletores de data (Calendar), a FluencyLab agora exige o uso de **Vaults** em vez de **Popovers**. 
+**IMPORTANTE:** Para seletores de data (Calendar), a WorkMate agora exige o uso de **Vaults** em vez de **Popovers**.
 
 Use o componente `CalendarVault` em vez de envolver um `Calendar` em um `Popover`. Isso evita problemas de z-index e "click-through" em interfaces mobile e modais aninhados.

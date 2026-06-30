@@ -6,7 +6,7 @@ This version has breaking changes — APIs, conventions, and file structure may 
 
 <!-- END:nextjs-agent-rules -->
 
-# FLUENCYLAB — Agent Instructions
+# WorkMate — Agent Instructions
 
 > **Leia PRIMEIRO. Este é o índice mestre do projeto.** As regras detalhadas vivem nos arquivos de `rules/`, as skills em `skills/`. Este arquivo conecta tudo e resolve ambiguidades.
 > Preferencialmente sempre verifique 'rules' e as 'skills' apenas quando for necessário.

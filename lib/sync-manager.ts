@@ -349,7 +349,7 @@ class SyncManager {
 
           // Fire Web Notification if authorized
           if (Notification.permission === "granted") {
-            new Notification("Pergunta Respondida (FluencyLab)", {
+            new Notification("Pergunta Respondida (WorkMate)", {
               body: serverMessage.content.substring(0, 100) + "...",
               icon: "/icons/android/launchericon-transparent-192x192.png",
             });

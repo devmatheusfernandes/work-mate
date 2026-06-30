@@ -1,8 +1,8 @@
 Firebase Authentication
-Nome público do projeto: FluencyLab Plataform
+Nome público do projeto: WorkMate Plataform
 Depois precisa criar no Google Cloud Console o ID do cliente do OAuth
 
-- Nome: FluencyLab Plataform
+- Nome: WorkMate Plataform
 - URI: http://localhost:3000
 - URI: -
 - URI de redirecionamento autorizado: http://localhost:3000/api/auth/callback
