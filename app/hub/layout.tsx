@@ -5,6 +5,8 @@ import { TasksSidebar } from "@/app/hub/notes/_components/tasks-sidebar";
 import { getCurrentUser } from "@/lib/safe-action";
 import { UserStoreInitializer } from "@/components/layout/user-store-initializer";
 
+export const dynamic = 'force-dynamic';
+
 export default async function HubLayout({ children }: { children: React.ReactNode }) {
   const user = await getCurrentUser();
 
