@@ -33,7 +33,7 @@ interface ChatState {
   loadSessions: (type?: "active" | "archived") => Promise<void>;
   loadMessages: (sessionId: string) => Promise<void>;
   createNewSession: () => Promise<string | null>;
-  sendMessage: (content: string) => Promise<void>;
+  sendMessage: (content: string, skipAiResponse?: boolean) => Promise<void>;
   sendAudioMessage: (file: File, mode: "transcribe" | "summarize" | "both", sessionId?: string | null) => Promise<void>;
   archiveSession: (sessionId: string, isArchived: boolean) => Promise<void>;
   deleteSession: (sessionId: string) => Promise<void>;
@@ -182,7 +182,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
     return null;
   },
 
-  sendMessage: async (content: string) => {
+  sendMessage: async (content: string, skipAiResponse?: boolean) => {
     if (!content.trim() || get().isGenerating) return;
 
     const isOffline = typeof window !== "undefined" && !window.navigator.onLine;
@@ -221,6 +221,25 @@ export const useChatStore = create<ChatState>((set, get) => ({
     };
 
     if (isOffline) {
+      if (skipAiResponse) {
+        set((state) => ({
+          messages: [...state.messages, userMessage],
+          isGenerating: false,
+        }));
+        try {
+          await saveOfflineItem("chatMessages", { ...userMessage, sessionId: actualSessionId });
+          await saveOfflineItem("syncQueue", {
+            id: `op_${tempMsgId}`,
+            actionName: "sendChatMessage",
+            payload: { sessionId: actualSessionId, content, tempMsgId, skipAiResponse },
+            timestamp: Date.now(),
+          });
+        } catch (err) {
+          console.error(err);
+        }
+        return;
+      }
+
       const assistantMessage: ChatMessage = {
         id: tempBotMsgId,
         role: "assistant",
@@ -260,22 +279,29 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
     const assistantMessageId = "msg_placeholder_" + Math.random().toString(36).substring(7);
 
-    // Add placeholder assistant message right away to show the "Pensando..." state
-    const placeholderAssistantMessage: ChatMessage = {
-      id: assistantMessageId,
-      role: "assistant",
-      content: "",
-      createdAt: new Date(),
-      promptTokens: null,
-      candidatesTokens: null,
-      cost: null,
-      precision: null,
-    };
+    if (skipAiResponse) {
+      set((state) => ({
+        messages: [...state.messages, userMessage],
+        isGenerating: false, // Don't block chat
+      }));
+    } else {
+      // Add placeholder assistant message right away to show the "Pensando..." state
+      const placeholderAssistantMessage: ChatMessage = {
+        id: assistantMessageId,
+        role: "assistant",
+        content: "",
+        createdAt: new Date(),
+        promptTokens: null,
+        candidatesTokens: null,
+        cost: null,
+        precision: null,
+      };
 
-    set((state) => ({
-      messages: [...state.messages, userMessage, placeholderAssistantMessage],
-      isGenerating: true,
-    }));
+      set((state) => ({
+        messages: [...state.messages, userMessage, placeholderAssistantMessage],
+        isGenerating: true,
+      }));
+    }
 
     let responseText = "";
     type RawServerMessage = Omit<ChatMessage, "createdAt" | "role"> & { createdAt: string | Date; role: string };
@@ -284,7 +310,8 @@ export const useChatStore = create<ChatState>((set, get) => ({
     try {
       const res = await sendChatMessageAction({ 
         sessionId: actualSessionId, 
-        content 
+        content,
+        skipAiResponse
       });
 
       if (res?.data?.success && res.data.message) {
@@ -296,6 +323,14 @@ export const useChatStore = create<ChatState>((set, get) => ({
           actualSessionId = res.data.sessionId;
           set({ currentSessionId: actualSessionId });
           await get().loadSessions();
+        }
+
+        if (skipAiResponse) {
+          const sMsg = serverMessage;
+          set((state) => ({
+            messages: state.messages.map((m) => m.id === tempMsgId ? { ...sMsg, createdAt: new Date(sMsg.createdAt) } as ChatMessage : m),
+          }));
+          return;
         }
       } else {
         responseText = res?.data?.error || "Desculpe, ocorreu um erro ao gerar a resposta.";
@@ -466,16 +501,32 @@ export const useChatStore = create<ChatState>((set, get) => ({
       // Build a user message that shows the audio context
       const modeLabel = mode === "transcribe" ? "Transcrição" : mode === "summarize" ? "Resumo" : "Transcrição e Resumo";
       
-      let audioContextMessage = `[🎵 Áudio enviado: **${file.name}** (${(file.size / 1024 / 1024).toFixed(1)}MB) — ${modeLabel}]\n\n${data.result}`;
-      
+      let userText = `[🎵 Áudio enviado: **${file.name}** (${(file.size / 1024 / 1024).toFixed(1)}MB) — ${modeLabel}]`;
       if (data.audioUrl) {
-        audioContextMessage = `[🎵 Áudio enviado: **${file.name}** (${(file.size / 1024 / 1024).toFixed(1)}MB) — ${modeLabel}](${data.audioUrl})\n\n${data.result}`;
+        userText = `[🎵 Áudio enviado: **${file.name}** (${(file.size / 1024 / 1024).toFixed(1)}MB) — ${modeLabel}](${data.audioUrl})`;
       }
 
       set({ isTranscribing: false, pendingAudioFile: null });
 
-      // Send the audio result as a chat message (which the AI will then respond to)
-      await get().sendMessage(audioContextMessage);
+      const saveRes = await import("@/modules/chat/chat.actions").then(m => m.saveAudioMessagesAction({
+        sessionId: actualSessionId!,
+        userText,
+        assistantText: data.result
+      }));
+
+      if (saveRes?.data?.success && saveRes.data.userMessage && saveRes.data.assistantMessage) {
+        const uMsg = saveRes.data.userMessage;
+        const aMsg = saveRes.data.assistantMessage;
+        set((state) => ({
+          messages: [
+            ...state.messages, 
+            { ...uMsg, createdAt: new Date(uMsg.createdAt) } as ChatMessage, 
+            { ...aMsg, createdAt: new Date(aMsg.createdAt) } as ChatMessage
+          ]
+        }));
+      } else {
+        toast.error("Áudio processado, mas falha ao salvar as mensagens na conversa.");
+      }
     } catch (error) {
       console.error("Erro ao enviar áudio:", error);
       toast.error("Erro de conexão ao processar o áudio.");

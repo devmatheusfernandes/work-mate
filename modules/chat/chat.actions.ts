@@ -17,6 +17,7 @@ const createChatSessionSchema = z.object({
 const sendChatMessageSchema = z.object({
   sessionId: z.string().nullable().optional(),
   content: z.string().min(1, "A mensagem não pode ser vazia"),
+  skipAiResponse: z.boolean().optional().default(false),
 });
 
 const archiveChatSessionSchema = z.object({
@@ -71,7 +72,8 @@ export const sendChatMessageAction = protectedAction
       const result = await chatService.sendMessage(
         ctx.user.id,
         parsedInput.sessionId || "",
-        parsedInput.content
+        parsedInput.content,
+        parsedInput.skipAiResponse
       );
       revalidatePath("/hub/chat");
       return { 
@@ -106,5 +108,38 @@ export const deleteChatSessionAction = protectedAction
       return { success: true };
     } catch (e: unknown) {
       return { success: false, error: e instanceof Error ? e.message : "Erro ao deletar conversa." };
+    }
+  });
+
+export const convertChatToNoteAction = protectedAction
+  .schema(z.object({ sessionId: z.string() }))
+  .action(async ({ parsedInput, ctx }) => {
+    try {
+      const note = await chatService.convertChatToNote(ctx.user.id, parsedInput.sessionId);
+      revalidatePath("/hub/notes");
+      return { success: true, noteId: note.id };
+    } catch (e: unknown) {
+      return { success: false, error: e instanceof Error ? e.message : "Erro ao converter chat em nota." };
+    }
+  });
+
+export const saveAudioMessagesAction = protectedAction
+  .schema(z.object({
+    sessionId: z.string(),
+    userText: z.string(),
+    assistantText: z.string()
+  }))
+  .action(async ({ parsedInput, ctx }) => {
+    try {
+      const result = await chatService.saveAudioMessages(
+        ctx.user.id,
+        parsedInput.sessionId,
+        parsedInput.userText,
+        parsedInput.assistantText
+      );
+      revalidatePath("/hub/chat");
+      return { success: true, userMessage: result.userMessage, assistantMessage: result.assistantMessage };
+    } catch (e: unknown) {
+      return { success: false, error: e instanceof Error ? e.message : "Erro ao salvar mensagens de áudio." };
     }
   });

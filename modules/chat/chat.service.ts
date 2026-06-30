@@ -45,7 +45,7 @@ export const chatService = {
     return chatRepository.deleteSession(userId, sessionId);
   },
 
-  async sendMessage(userId: string, sessionId: string, content: string) {
+  async sendMessage(userId: string, sessionId: string, content: string, skipAiResponse?: boolean) {
     // 1. Validate session ownership
     let session = await chatRepository.getSessionById(userId, sessionId);
     if (!session) {
@@ -217,12 +217,19 @@ ${eventsText}`);
 
     // 4. Save the user's message in the database
     const userMsgId = "msg_" + Math.random().toString(36).substring(2, 11);
-    await chatRepository.createMessage({
+    const userMessage = await chatRepository.createMessage({
       id: userMsgId,
       sessionId: session.id,
       role: "user",
       content,
     });
+
+    if (skipAiResponse) {
+      return {
+        message: userMessage,
+        sessionId: session.id,
+      };
+    }
 
     // 5. Build prompt system instructions
     const systemDateStr = new Date().toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" });
@@ -231,7 +238,7 @@ Seu objetivo é ajudar o usuário com seus resumos, anotações, organização d
 
 A data e hora atual do sistema (hoje) é: ${systemDateStr} (Horário de Brasília). Use sempre esta data e hora como referência absoluta para interpretar expressões temporais do usuário como "hoje", "amanhã", "ontem", "esta semana" ou "próxima segunda-feira".
 
-INSTRUÇÕES CRICIAIS DE FORMATAÇÃO E RESPOSTA:
+INSTRUÇÕES CRITICAS DE FORMATAÇÃO E RESPOSTA:
 1. Responda em português de forma clara, amigável e objetiva. Use negritos, listas e títulos curtos.
 2. Quando mencionar ou citar uma nota, arquivo PDF ou planilha Excel específico que exista nas listas de contexto, você DEVE criar um link em formato markdown para o usuário poder clicar e abri-lo:
    - Para Notas, PDFs ou Planilhas: [Título](/hub/notes/ID)
@@ -241,6 +248,28 @@ INSTRUÇÕES CRICIAIS DE FORMATAÇÃO E RESPOSTA:
    - Exemplo: "Vi que a tarefa [Comprar Livro](/hub/tasks?taskId=note_456) ainda está pendente."
 4. Ao falar sobre tarefas, você tem acesso às subtarefas e ao status de conclusão delas. Mostre que sabe quais estão concluídas e quais estão pendentes caso o usuário pergunte.
 5. Você também tem acesso aos compromissos da agenda do usuário (calendários e eventos). Se o usuário perguntar sobre o que ele tem para fazer, reuniões, compromissos em datas específicas ou cronograma, consulte o contexto de calendário fornecido e responda de forma organizada e cronológica.
+6. AÇÕES INTERATIVAS PARA CRIAR ITENS: Sempre que você recomendar ativamente que o usuário crie uma nova Tarefa ou Nota, você DEVE gerar um bloco de código JSON especial (com a linguagem "json") contendo os dados completos da tarefa ou nota. O formato deve ser exato:
+
+Para criar uma TAREFA:
+\`\`\`json
+{
+  "action": "create-task",
+  "title": "Nome da Tarefa",
+  "taskDeadline": "YYYY-MM-DDTHH:mm:ssZ",
+  "taskSubtasks": ["Fazer isso", "Fazer aquilo"]
+}
+\`\`\`
+
+Para criar uma NOTA:
+\`\`\`json
+{
+  "action": "create-note",
+  "title": "Nome da Nota",
+  "content": "Conteúdo rico da nota (pode conter markdown, resumos detalhados e tópicos)"
+}
+\`\`\`
+
+O usuário verá um botão mágico no lugar desse JSON para criar o item instantaneamente! Não use mais o formato de link antigo. Use sempre o bloco JSON quando quiser oferecer a criação de algo.
 
 Abaixo estão as informações reais do usuário (notas, tarefas e compromissos da agenda) para você usar como contexto:
 
@@ -308,5 +337,75 @@ ${relevantNotesContext || "Nenhum conteúdo detalhado adicional relevante encont
       message: dbMessage,
       sessionId: session.id,
     };
+  },
+
+  async saveAudioMessages(userId: string, sessionId: string, userText: string, assistantText: string) {
+    const session = await chatRepository.getSessionById(userId, sessionId);
+    if (!session) {
+      throw new Error("Sessão não encontrada ou sem permissão.");
+    }
+
+    const userMsgId = "msg_" + Math.random().toString(36).substring(2, 11);
+    const userMessage = await chatRepository.createMessage({
+      id: userMsgId,
+      sessionId: session.id,
+      role: "user",
+      content: userText,
+    });
+
+    const assistantMsgId = "msg_" + Math.random().toString(36).substring(2, 11);
+    const assistantMessage = await chatRepository.createMessage({
+      id: assistantMsgId,
+      sessionId: session.id,
+      role: "assistant",
+      content: assistantText,
+    });
+
+    return {
+      userMessage,
+      assistantMessage,
+      sessionId: session.id,
+    };
+  },
+
+  async convertChatToNote(userId: string, sessionId: string) {
+    const session = await chatRepository.getSessionById(userId, sessionId);
+    if (!session) {
+      throw new Error("Sessão não encontrada ou sem permissão.");
+    }
+    
+    const messages = await chatRepository.getMessagesBySession(sessionId);
+    if (!messages || messages.length === 0) {
+      throw new Error("Não há mensagens nesta conversa para resumir.");
+    }
+
+    const chatContent = messages.map(m => `${m.role === 'user' ? 'Usuário' : 'Assistente'}: ${m.content}`).join("\n\n");
+
+    const systemInstruction = `Você é um especialista em sumarização de conversas. Seu objetivo é resumir o chat fornecido em uma Nota organizada em formato Markdown, focando nas decisões tomadas, ideias principais, e tarefas mencionadas. Formate com Títulos e Bullet Points. NÃO adicione introduções ou conclusões genéricas, apenas entregue o conteúdo da nota.`;
+
+    if (!genAI) {
+      throw new Error("Chave de API do Gemini não configurada.");
+    }
+
+    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+    const result = await model.generateContent({
+      contents: [{ role: "user", parts: [{ text: chatContent }] }],
+      systemInstruction,
+    });
+
+    const summary = result.response.text();
+
+    const note = await notesService.createNote(userId, {
+      title: `Resumo: ${session.title}`,
+      content: summary,
+      type: "note",
+      archived: false,
+      trashed: false,
+      pinned: false,
+      isLocked: false,
+      tagIds: [],
+    });
+
+    return note;
   },
 };

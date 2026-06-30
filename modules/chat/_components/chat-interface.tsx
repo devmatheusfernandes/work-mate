@@ -20,17 +20,22 @@ import {
   Mic,
   FileAudio,
   Loader2,
-  Headphones
+  Headphones,
+  FilePlus,
+  CheckSquare
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { useChatStore } from "../chat.store";
 import { Button } from "@/components/ui/button";
 import { useCalendarStore } from "@/modules/calendar/calendar.store";
-import { getNotesAction } from "@/modules/notes/notes.actions";
+import { getNotesAction, createNoteAction } from "@/modules/notes/notes.actions";
+import { convertChatToNoteAction } from "@/modules/chat/chat.actions";
 import { Note } from "@/modules/notes/notes.schema";
 import { Header } from "@/components/layout/header";
 import { useDevice } from "@/hooks/ui/use-device";
+import { TaskDetailsVault } from "@/app/hub/notes/_components/task-details-vault";
+import { NoteDetailsVault } from "@/app/hub/notes/_components/note-details-vault";
 
 interface ChatInterfaceProps {
   isSidebar?: boolean;
@@ -103,6 +108,14 @@ export function ChatInterface({
   const [availableCalendars, setAvailableCalendars] = useState<{ id: string; summary: string }[]>([]);
   const [activeSuggestionIndex, setActiveSuggestionIndex] = useState(0);
   const [selectedReferences, setSelectedReferences] = useState<{ id: string; title: string; type: string }[]>([]);
+
+  // Vault state
+  const [selectedVaultNote, setSelectedVaultNote] = useState<Note | null>(null);
+  const [isVaultOpen, setIsVaultOpen] = useState(false);
+
+  // Action Tracking State
+  const [createdActions, setCreatedActions] = useState<Record<string, Note>>({});
+  const [creatingActions, setCreatingActions] = useState<Set<string>>(new Set());
 
   // Fetch mention context data
   useEffect(() => {
@@ -326,48 +339,282 @@ export function ChatInterface({
 
   const hasMessages = messages.length > 0;
 
+  const handleQuickCreate = async (type: "task" | "note", title: string) => {
+    toast.promise(
+      createNoteAction({ 
+        title, 
+        type,
+        archived: false,
+        trashed: false,
+        pinned: false,
+        isLocked: false,
+        tagIds: []
+      }),
+      {
+        loading: `Criando ${type === "task" ? "tarefa" : "nota"}...`,
+        success: (res) => {
+           if (res?.data?.success) {
+             const createdNote = res.data.note;
+             return (
+               <div className="flex items-center gap-2">
+                 <span>{type === "task" ? "Tarefa" : "Nota"} criada!</span>
+                 <button 
+                   onClick={() => {
+                     setSelectedVaultNote(createdNote);
+                     setIsVaultOpen(true);
+                   }}
+                   className="underline font-bold text-primary cursor-pointer hover:text-primary/80 transition-colors"
+                 >
+                   Abrir
+                 </button>
+               </div>
+             );
+           }
+           throw new Error(res?.serverError || "Erro desconhecido");
+        },
+        error: "Falha ao criar",
+      }
+    );
+  };
+
+  const handleAdvancedQuickCreate = async (data: any) => {
+    const actionKey = JSON.stringify(data);
+    if (creatingActions.has(actionKey) || createdActions[actionKey]) return; // Prevent double creation
+
+    setCreatingActions(prev => new Set(prev).add(actionKey));
+
+    const isTask = data.action === "create-task";
+    const type = isTask ? "task" : "note";
+    const title = data.title || (isTask ? "Nova Tarefa" : "Nova Nota");
+    
+    // Convert array of strings into proper subtask objects
+    const formattedSubtasks = isTask && Array.isArray(data.taskSubtasks) 
+      ? data.taskSubtasks.map((st: string) => ({
+          id: Math.random().toString(36).substring(2, 11),
+          title: st,
+          completed: false
+        }))
+      : [];
+
+    toast.promise(
+      createNoteAction({ 
+        title, 
+        type,
+        content: data.content || null,
+        taskDeadline: data.taskDeadline || null,
+        taskSubtasks: formattedSubtasks,
+        archived: false,
+        trashed: false,
+        pinned: false,
+        isLocked: false,
+        tagIds: []
+      }),
+      {
+        loading: `Criando ${type === "task" ? "tarefa" : "nota"}...`,
+        success: (res) => {
+           setCreatingActions(prev => {
+             const next = new Set(prev);
+             next.delete(actionKey);
+             return next;
+           });
+
+           if (res?.data?.success) {
+             const createdNote = res.data.note;
+             setCreatedActions(prev => ({ ...prev, [actionKey]: createdNote }));
+             return (
+               <div className="flex items-center gap-2">
+                 <span>{type === "task" ? "Tarefa" : "Nota"} criada!</span>
+                 <button 
+                   onClick={() => {
+                     setSelectedVaultNote(createdNote);
+                     setIsVaultOpen(true);
+                   }}
+                   className="underline font-bold text-primary cursor-pointer hover:text-primary/80 transition-colors"
+                 >
+                   Abrir
+                 </button>
+               </div>
+             );
+           }
+           throw new Error(res?.serverError || "Erro desconhecido");
+        },
+        error: () => {
+           setCreatingActions(prev => {
+             const next = new Set(prev);
+             next.delete(actionKey);
+             return next;
+           });
+           return "Falha ao criar";
+        },
+      }
+    );
+  };
+
+  const handleConvertChatToNote = async () => {
+    if (!currentSessionId) return;
+    toast.promise(
+      convertChatToNoteAction({ sessionId: currentSessionId }),
+      {
+        loading: "Resumindo chat em uma nota...",
+        success: (res) => {
+          if (res?.data?.success && res.data.noteId) {
+            return (
+              <span>
+                Chat convertido!{" "}
+                <a href={`/hub/notes/${res.data.noteId}`} className="underline font-bold ml-1 text-primary">Abrir Nota</a>
+              </span>
+            );
+          }
+          throw new Error(res?.serverError || "Erro desconhecido");
+        },
+        error: "Falha ao converter chat em nota",
+      }
+    );
+  };
+
+  const renderLineWithActions = (text: string) => {
+    const parts = text.split(/(\[.*?\]\(action:create-(?:task|note)\?title=.*?\))/);
+    return parts.map((part, i) => {
+      const match = part.match(/^\[(.*?)\]\(action:create-(task|note)\?title=(.*?)\)$/);
+      if (match) {
+        const label = match[1];
+        const type = match[2] as "task" | "note";
+        const title = decodeURIComponent(match[3].replace(/\+/g, "%20"));
+        return (
+          <Button 
+            key={i} 
+            variant="secondary" 
+            size="sm" 
+            className="mx-1 h-6 px-2 text-[11px] rounded-full cursor-pointer hover:bg-primary/20 hover:text-primary transition-colors border border-primary/20 text-primary bg-primary/10"
+            onClick={() => handleQuickCreate(type, title)}
+          >
+            <Plus className="size-3 mr-1" /> {label}
+          </Button>
+        );
+      }
+      
+      let formattedText = part.replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>");
+      formattedText = formattedText.replace(/`(.*?)`/g, "<code class='bg-muted/80 px-1 py-0.5 rounded text-xs font-mono border border-border/20'>$1</code>");
+      formattedText = formattedText.replace(/\[(.*?)\]\((.*?)\)/g, "<a href='$2' target='_blank' rel='noopener noreferrer' class='text-blue-500 hover:text-blue-400 hover:underline font-bold transition-colors'>$1</a>");
+      
+      return <span key={i} dangerouslySetInnerHTML={{ __html: formattedText }} />;
+    });
+  };
+
   // Render markdown-like formatting in messages
   const renderMessageContent = (content: string) => {
-    return content.split("\n").map((paragraph, index) => {
-      // Audio player: [🎵 Áudio enviado: ...](url)
-      const audioMatch = paragraph.match(/^\[🎵 Áudio enviado: (.*?)\]\((.*?)\)$/);
-      if (audioMatch) {
-        const text = audioMatch[1]; // **nome** (tamanho) — modo
-        const url = audioMatch[2];
-        const formattedText = text.replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>");
-        return (
-          <div key={index} className="flex flex-col gap-2 mb-3 bg-black/10 dark:bg-white/5 p-3 rounded-xl border border-white/10">
-            <div className="text-xs flex items-center gap-2 opacity-90" dangerouslySetInnerHTML={{ __html: `🎵 Áudio enviado: ${formattedText}` }} />
-            <audio controls src={url} className="w-full h-10 mt-1 rounded-md" />
-          </div>
-        );
+    // 1. First split by ```json blocks
+    const parts = content.split(/(```json\n[\s\S]*?\n```)/);
+
+    return parts.map((part, index) => {
+      // 2. If it's a JSON block, parse it and render the card
+      if (part.startsWith("```json")) {
+        const jsonStr = part.replace(/^```json\n/, "").replace(/\n```$/, "");
+        try {
+          const data = JSON.parse(jsonStr);
+          if (data.action === "create-task" || data.action === "create-note") {
+            const isTask = data.action === "create-task";
+            const type = isTask ? "task" : "note";
+            const title = data.title || (isTask ? "Nova Tarefa" : "Nova Nota");
+            const actionKey = JSON.stringify(data);
+            const isCreating = creatingActions.has(actionKey);
+            const createdNote = createdActions[actionKey];
+
+            return (
+              <div key={index} className="my-3 p-3 bg-primary/5 border border-primary/20 rounded-xl flex flex-col gap-2">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2 text-primary font-medium text-sm">
+                    {isTask ? <CheckSquare className="size-4" /> : <FileText className="size-4" />}
+                    <span>Sugestão de {isTask ? "Tarefa" : "Nota"}: {title}</span>
+                  </div>
+                  {createdNote ? (
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      className="h-7 px-3 text-xs rounded-full border-emerald-500 text-emerald-500 hover:bg-emerald-500/10 hover:text-emerald-500"
+                      onClick={() => {
+                        setSelectedVaultNote(createdNote);
+                        setIsVaultOpen(true);
+                      }}
+                    >
+                      <CheckCircle2 className="size-3 mr-1" /> Abrir
+                    </Button>
+                  ) : (
+                    <Button 
+                      variant="default" 
+                      size="sm" 
+                      className="h-7 px-3 text-xs rounded-full cursor-pointer"
+                      onClick={() => handleAdvancedQuickCreate(data)}
+                      disabled={isCreating}
+                    >
+                      {isCreating ? <Loader2 className="size-3 mr-1 animate-spin" /> : <Plus className="size-3 mr-1" />}
+                      {isCreating ? "Criando..." : "Criar"}
+                    </Button>
+                  )}
+                </div>
+                {data.content && (
+                  <div className="text-xs text-muted-foreground line-clamp-2 italic border-l-2 border-primary/30 pl-2">
+                    {data.content.substring(0, 100)}{data.content.length > 100 ? "..." : ""}
+                  </div>
+                )}
+                {isTask && data.taskSubtasks && data.taskSubtasks.length > 0 && (
+                  <div className="text-xs text-muted-foreground mt-1">
+                    <span className="font-semibold">{data.taskSubtasks.length}</span> subtarefas incluídas.
+                  </div>
+                )}
+              </div>
+            );
+          }
+        } catch (e) {
+          // ignore parsing error, fallback below
+        }
       }
 
-      // Bold text formatting **text**
-      let formattedText = paragraph.replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>");
-      
-      // Inline code blocks `code`
-      formattedText = formattedText.replace(/`(.*?)`/g, "<code class='bg-muted/80 px-1 py-0.5 rounded text-xs font-mono border border-border/20'>$1</code>");
-
-      // Markdown links [text](url) - ignore the ones already handled by audioMatch
-      formattedText = formattedText.replace(/\[(.*?)\]\((.*?)\)/g, "<a href='$2' target='_blank' rel='noopener noreferrer' class='text-blue-500 hover:text-blue-400 hover:underline font-bold transition-colors'>$1</a>");
-
-      // Lists: check if paragraph starts with - or * or number.
-      if (paragraph.startsWith("- ") || paragraph.startsWith("* ")) {
-        return (
-          <li key={index} className="ml-4 list-disc text-sm leading-relaxed mb-1" dangerouslySetInnerHTML={{ __html: formattedText.substring(2) }} />
-        );
-      }
-      
-      if (/^\d+\.\s/.test(paragraph)) {
-        const dotIndex = paragraph.indexOf(". ");
-        return (
-          <li key={index} className="ml-4 list-decimal text-sm leading-relaxed mb-1" dangerouslySetInnerHTML={{ __html: formattedText.substring(dotIndex + 2) }} />
-        );
-      }
-
+      // 3. Fallback to normal rendering for regular text
       return (
-        <p key={index} className="text-sm leading-relaxed mb-2" dangerouslySetInnerHTML={{ __html: formattedText }} />
+        <div key={index}>
+          {part.split("\n").map((paragraph, pIndex) => {
+            if (!paragraph.trim()) return <br key={pIndex} className="h-2" />;
+
+            // Audio player: [🎵 Áudio enviado: ...](url)
+            const audioMatch = paragraph.match(/^\[🎵 Áudio enviado: (.*?)\]\((.*?)\)$/);
+            if (audioMatch) {
+              const text = audioMatch[1]; // **nome** (tamanho) — modo
+              const url = audioMatch[2];
+              const formattedText = text.replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>");
+              return (
+                <div key={pIndex} className="flex flex-col gap-2 mb-3 bg-black/10 dark:bg-white/5 p-3 rounded-xl border border-white/10">
+                  <div className="text-xs flex items-center gap-2 opacity-90" dangerouslySetInnerHTML={{ __html: `🎵 Áudio enviado: ${formattedText}` }} />
+                  <audio controls src={url} className="w-full h-10 mt-1 rounded-md" />
+                </div>
+              );
+            }
+
+            // Lists: check if paragraph starts with - or * or number.
+            if (paragraph.startsWith("- ") || paragraph.startsWith("* ")) {
+              return (
+                <li key={pIndex} className="ml-4 list-disc text-sm leading-relaxed mb-1">
+                  {renderLineWithActions(paragraph.substring(2))}
+                </li>
+              );
+            }
+            
+            if (/^\d+\.\s/.test(paragraph)) {
+              const dotIndex = paragraph.indexOf(". ");
+              return (
+                <li key={pIndex} className="ml-4 list-decimal text-sm leading-relaxed mb-1">
+                  {renderLineWithActions(paragraph.substring(dotIndex + 2))}
+                </li>
+              );
+            }
+
+            return (
+              <p key={pIndex} className="text-sm leading-relaxed mb-2">
+                {renderLineWithActions(paragraph)}
+              </p>
+            );
+          })}
+        </div>
       );
     });
   };
@@ -648,15 +895,26 @@ export function ChatInterface({
 
           <div className="flex items-center gap-1.5">
             {hasMessages && (
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-8 w-8 text-muted-foreground hover:text-destructive transition-colors rounded-full shrink-0 cursor-pointer"
-                onClick={clearMessages}
-                title="Limpar conversa local"
-              >
-                <Trash2 className="size-4" />
-              </Button>
+              <>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8 text-muted-foreground hover:text-primary transition-colors rounded-full shrink-0 cursor-pointer"
+                  onClick={handleConvertChatToNote}
+                  title="Resumir em Nota"
+                >
+                  <FilePlus className="size-4" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8 text-muted-foreground hover:text-destructive transition-colors rounded-full shrink-0 cursor-pointer"
+                  onClick={clearMessages}
+                  title="Limpar conversa local"
+                >
+                  <Trash2 className="size-4" />
+                </Button>
+              </>
             )}
 
             
@@ -1132,6 +1390,30 @@ export function ChatInterface({
     </div>
   );
 
+  const vaults = selectedVaultNote ? (
+    <>
+      {selectedVaultNote.type === "task" ? (
+        <TaskDetailsVault
+          task={selectedVaultNote}
+          open={isVaultOpen}
+          onOpenChange={(open) => {
+            setIsVaultOpen(open);
+            if (!open) setTimeout(() => setSelectedVaultNote(null), 300);
+          }}
+        />
+      ) : (
+        <NoteDetailsVault
+          note={selectedVaultNote}
+          open={isVaultOpen}
+          onOpenChange={(open) => {
+            setIsVaultOpen(open);
+            if (!open) setTimeout(() => setSelectedVaultNote(null), 300);
+          }}
+        />
+      )}
+    </>
+  ) : null;
+
   if (!isSidebar && isMobileOrPwa) {
     return (
       <div className="flex flex-col h-full w-full overflow-hidden">
@@ -1139,9 +1421,15 @@ export function ChatInterface({
         <div className="flex-1 min-h-0">
           {content}
         </div>
+        {vaults}
       </div>
     );
   }
 
-  return content;
+  return (
+    <>
+      {content}
+      {vaults}
+    </>
+  );
 }
