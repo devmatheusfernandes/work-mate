@@ -121,5 +121,28 @@
         }
       ]
     }
-  }
+  },
+  "screenshots": [
+    {
+      "src": "/screenshots/screenshot1.jpeg",
+      "sizes": "1080x2340",
+      "type": "image/jpeg",
+      "form_factor": "narrow"
+    },
+    {
+      "src": "/screenshots/screenshot2.jpeg",
+      "sizes": "1080x2340",
+      "type": "image/jpeg"
+    },
+    {
+      "src": "/screenshots/screenshot3.jpeg",
+      "sizes": "1080x2340",
+      "type": "image/jpeg"
+    },
+    {
+      "src": "/screenshots/screenshot4.jpeg",
+      "sizes": "1080x2340",
+      "type": "image/jpeg"
+    }
+  ]
 }
