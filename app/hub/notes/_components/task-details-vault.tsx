@@ -13,9 +13,10 @@ import {
   Bell,
   BellOff,
   Plus,
-  Trash2,
   ArrowRight,
   X,
+  Archive,
+  Trash2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
@@ -235,10 +236,46 @@ export function TaskDetailsVault({
       }
     } catch {
       toast.error("Erro ao converter.", { id: toastId });
-    } finally {
-      setIsConverting(false);
-    }
-  };
+      } finally {
+        setIsConverting(false);
+      }
+    };
+
+    const handleArchiveTask = async () => {
+      const toastId = toast.loading("Arquivando tarefa...");
+      try {
+        const result = await updateNoteAction({
+          id: task.id,
+          updates: { archived: true },
+        });
+        if (result?.data?.success) {
+          toast.success("Tarefa arquivada!", { id: toastId });
+          onOpenChange(false);
+        } else {
+          toast.error("Erro ao arquivar.", { id: toastId });
+        }
+      } catch {
+        toast.error("Erro ao arquivar.", { id: toastId });
+      }
+    };
+
+    const handleTrashTask = async () => {
+      const toastId = toast.loading("Excluindo tarefa...");
+      try {
+        const result = await updateNoteAction({
+          id: task.id,
+          updates: { trashed: true },
+        });
+        if (result?.data?.success) {
+          toast.success("Tarefa movida para a lixeira!", { id: toastId });
+          onOpenChange(false);
+        } else {
+          toast.error("Erro ao excluir.", { id: toastId });
+        }
+      } catch {
+        toast.error("Erro ao excluir.", { id: toastId });
+      }
+    };
 
   return (
     <Vault open={open} onOpenChange={onOpenChange}>
@@ -421,32 +458,44 @@ export function TaskDetailsVault({
           </div>
 
           <div className="flex min-w-full items-center gap-2">
-          <Link
-            href={`/hub/tasks?taskId=${task.id}`}
-            onClick={() => onOpenChange(false)}
-          >
-            <Button className="min-w-full!" variant="outline">
-            Ver no Kanban
-            <ArrowRight className="ml-2 size-4" />
-            </Button>
-          </Link>
-          <Button
-            variant="destructive"
-            onClick={handleConvertToNote}
-            disabled={isConverting}
+            <Link
+              href={`/hub/tasks?taskId=${task.id}`}
+              onClick={() => onOpenChange(false)}
+              className="flex-1"
             >
-             {isConverting ? (
-              <>
-                <Loader2 className="size-4 animate-spin" />
-                Convertendo...
-              </>
-            ) : (
-              <>
-                <X className="size-4" />
-                Voltar para Nota
-              </>
-            )}
-          </Button>
+              <Button className="w-full" variant="outline">
+                Ver no Kanban
+                <ArrowRight className="ml-2 size-4" />
+              </Button>
+            </Link>
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={handleConvertToNote}
+              disabled={isConverting}
+              title="Converter para Nota"
+              className="shrink-0"
+            >
+              {isConverting ? <Loader2 className="size-4 animate-spin" /> : <X className="size-4" />}
+            </Button>
+            <Button
+              variant="secondary"
+              size="icon"
+              onClick={handleArchiveTask}
+              title="Arquivar Tarefa"
+              className="shrink-0"
+            >
+              <Archive className="size-4" />
+            </Button>
+            <Button
+              variant="destructive"
+              size="icon"
+              onClick={handleTrashTask}
+              title="Excluir Tarefa"
+              className="shrink-0"
+            >
+              <Trash2 className="size-4" />
+            </Button>
           </div>
         </VaultBody>
       </VaultContent>

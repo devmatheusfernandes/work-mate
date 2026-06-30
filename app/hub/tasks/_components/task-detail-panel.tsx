@@ -13,6 +13,7 @@ import {
   Plus,
   Trash2,
   RotateCcw,
+  Archive,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { Note, TaskStatus, Subtask } from "@/modules/notes/notes.schema";
@@ -284,6 +285,42 @@ export function TaskDetailPanel({ task, onClose }: TaskDetailPanelProps) {
     }
   };
 
+  const handleArchiveTask = async () => {
+    const toastId = toast.loading("Arquivando tarefa...");
+    try {
+      const result = await updateNoteAction({
+        id: task.id,
+        updates: { archived: true },
+      });
+      if (result?.data?.success) {
+        toast.success("Tarefa arquivada!", { id: toastId });
+        onClose();
+      } else {
+        toast.error("Erro ao arquivar.", { id: toastId });
+      }
+    } catch {
+      toast.error("Erro ao arquivar.", { id: toastId });
+    }
+  };
+
+  const handleTrashTask = async () => {
+    const toastId = toast.loading("Excluindo tarefa...");
+    try {
+      const result = await updateNoteAction({
+        id: task.id,
+        updates: { trashed: true },
+      });
+      if (result?.data?.success) {
+        toast.success("Tarefa movida para a lixeira!", { id: toastId });
+        onClose();
+      } else {
+        toast.error("Erro ao excluir.", { id: toastId });
+      }
+    } catch {
+      toast.error("Erro ao excluir.", { id: toastId });
+    }
+  };
+
   const completedCount = subtasks.filter((s) => s.completed).length;
   const progress = subtasks.length > 0 ? (completedCount / subtasks.length) * 100 : 0;
 
@@ -489,6 +526,21 @@ export function TaskDetailPanel({ task, onClose }: TaskDetailPanelProps) {
         >
           <RotateCcw className="size-3.5" />
           Transformar em Nota
+        </button>
+        <div className="flex-1" />
+        <button
+          onClick={handleArchiveTask}
+          className="flex items-center justify-center p-1.5 rounded-lg border border-border/50 text-muted-foreground hover:text-foreground hover:bg-muted/30 transition-all cursor-pointer"
+          title="Arquivar Tarefa"
+        >
+          <Archive className="size-3.5" />
+        </button>
+        <button
+          onClick={handleTrashTask}
+          className="flex items-center justify-center p-1.5 rounded-lg border border-border/50 text-muted-foreground hover:text-destructive hover:bg-destructive/10 hover:border-destructive/30 transition-all cursor-pointer"
+          title="Excluir Tarefa"
+        >
+          <Trash2 className="size-3.5" />
         </button>
       </div>
     </div>
