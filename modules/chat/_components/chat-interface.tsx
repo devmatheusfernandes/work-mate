@@ -16,7 +16,11 @@ import {
   FileText,
   CheckCircle2,
   Calendar as CalendarIcon,
-  ChevronRight
+  ChevronRight,
+  Mic,
+  FileAudio,
+  Loader2,
+  Headphones
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -65,11 +69,15 @@ export function ChatInterface({
     isGenerating,
     isLoadingSessions,
     isLoadingMessages,
+    isTranscribing,
+    pendingAudioFile,
     setSidebarOpen,
+    setPendingAudioFile,
     setCurrentSessionId,
     loadSessions,
     createNewSession,
     sendMessage,
+    sendAudioMessage,
     archiveSession,
     deleteSession,
     clearMessages,
@@ -77,9 +85,13 @@ export function ChatInterface({
 
   const [inputValue, setInputValue] = useState("");
   const [isFocused, setIsFocused] = useState(false);
+  const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   const [sessionsType, setSessionsType] = useState<"active" | "archived">("active");
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Audio action selection state
+  const [pendingAudioAction, setPendingAudioAction] = useState<"transcribe" | "summarize" | "both" | null>(null);
 
   // Mention / Reference states
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -271,10 +283,38 @@ export function ChatInterface({
     }
   };
 
-  const handleUploadSimulate = () => {
-    toast.success("Upload simulado com sucesso! Arquivo anexado à conversa.", {
-      description: "O assistente agora analisará o documento anexado.",
-    });
+  const AUDIO_EXTENSIONS = /\.(opus|m4a|mp3|wav|ogg|webm|aac|flac)$/i;
+  const AUDIO_MIME = /^audio\//;
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    // Reset input so same file can be re-selected if needed
+    e.target.value = "";
+
+    const isAudio = AUDIO_MIME.test(file.type) || AUDIO_EXTENSIONS.test(file.name);
+    if (isAudio) {
+      if (file.size > 15 * 1024 * 1024) {
+        toast.error("Arquivo de áudio muito grande. O limite é 15MB.");
+        return;
+      }
+      setPendingAudioFile(file);
+      setPendingAudioAction(null); // reset action so user picks
+    } else {
+      toast.info("Por enquanto apenas arquivos de áudio são suportados (.opus, .m4a, .mp3, .wav, .ogg, .webm).");
+    }
+  };
+
+  const handleSendAudio = async (mode: "transcribe" | "summarize" | "both") => {
+    if (!pendingAudioFile) return;
+    setPendingAudioAction(mode);
+    await sendAudioMessage(pendingAudioFile, mode);
+    setPendingAudioAction(null);
+  };
+
+  const handleRemoveAudio = () => {
+    setPendingAudioFile(null);
+    setPendingAudioAction(null);
   };
 
   const handleNewChat = async () => {
@@ -289,14 +329,28 @@ export function ChatInterface({
   // Render markdown-like formatting in messages
   const renderMessageContent = (content: string) => {
     return content.split("\n").map((paragraph, index) => {
+      // Audio player: [🎵 Áudio enviado: ...](url)
+      const audioMatch = paragraph.match(/^\[🎵 Áudio enviado: (.*?)\]\((.*?)\)$/);
+      if (audioMatch) {
+        const text = audioMatch[1]; // **nome** (tamanho) — modo
+        const url = audioMatch[2];
+        const formattedText = text.replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>");
+        return (
+          <div key={index} className="flex flex-col gap-2 mb-3 bg-black/10 dark:bg-white/5 p-3 rounded-xl border border-white/10">
+            <div className="text-xs flex items-center gap-2 opacity-90" dangerouslySetInnerHTML={{ __html: `🎵 Áudio enviado: ${formattedText}` }} />
+            <audio controls src={url} className="w-full h-10 mt-1 rounded-md" />
+          </div>
+        );
+      }
+
       // Bold text formatting **text**
       let formattedText = paragraph.replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>");
       
       // Inline code blocks `code`
       formattedText = formattedText.replace(/`(.*?)`/g, "<code class='bg-muted/80 px-1 py-0.5 rounded text-xs font-mono border border-border/20'>$1</code>");
 
-      // Markdown links [text](url)
-      formattedText = formattedText.replace(/\[(.*?)\]\((.*?)\)/g, "<a href='$2' class='text-blue-500 hover:text-blue-400 hover:underline font-bold transition-colors'>$1</a>");
+      // Markdown links [text](url) - ignore the ones already handled by audioMatch
+      formattedText = formattedText.replace(/\[(.*?)\]\((.*?)\)/g, "<a href='$2' target='_blank' rel='noopener noreferrer' class='text-blue-500 hover:text-blue-400 hover:underline font-bold transition-colors'>$1</a>");
 
       // Lists: check if paragraph starts with - or * or number.
       if (paragraph.startsWith("- ") || paragraph.startsWith("* ")) {
@@ -433,15 +487,15 @@ export function ChatInterface({
         )}
       </AnimatePresence>
 
-      {/* MOBILE DRAWER SIDEBAR */}
+      {/* MOBILE OR OVERLAY HISTORY DRAWER */}
       <AnimatePresence>
-        {isSidebarOpen && !isSidebar && (
+        {((isSidebar && isHistoryOpen) || (!isSidebar && isSidebarOpen && isMobileOrPwa)) && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="md:hidden fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex justify-start select-none"
-            onClick={() => setSidebarOpen(false)}
+            className="absolute inset-0 z-50 bg-black/60 backdrop-blur-xs flex justify-start select-none"
+            onClick={() => isSidebar ? setIsHistoryOpen(false) : setSidebarOpen(false)}
           >
             <motion.div
               initial={{ x: -260 }}
@@ -466,7 +520,7 @@ export function ChatInterface({
                   <Button
                     variant="ghost"
                     size="icon"
-                    onClick={() => setSidebarOpen(false)}
+                    onClick={() => isSidebar ? setIsHistoryOpen(false) : setSidebarOpen(false)}
                     className="h-8 w-8 rounded-full hover:bg-muted text-muted-foreground hover:text-foreground shrink-0 cursor-pointer"
                   >
                     <X className="size-4" />
@@ -510,7 +564,11 @@ export function ChatInterface({
                       key={session.id}
                       onClick={() => {
                         setCurrentSessionId(session.id);
-                        setSidebarOpen(false);
+                        if (isSidebar) {
+                          setIsHistoryOpen(false);
+                        } else {
+                          setSidebarOpen(false);
+                        }
                       }}
                       className={cn(
                         "group flex items-center justify-between p-2.5 rounded-xl cursor-pointer text-left transition-all relative border border-transparent",
@@ -565,13 +623,13 @@ export function ChatInterface({
         )}>
           <div className="flex items-center gap-2">
             
-            {!isSidebar && (
+            {(!isSidebar || isSidebar) && (
               <Button
                 variant="ghost"
                 size="icon"
-                onClick={() => setSidebarOpen(!isSidebarOpen)}
+                onClick={() => isSidebar ? setIsHistoryOpen(!isHistoryOpen) : setSidebarOpen(!isSidebarOpen)}
                 className="h-8 w-8 rounded-full hover:bg-muted text-muted-foreground hover:text-foreground cursor-pointer mr-1"
-                title={isSidebarOpen ? "Ocultar histórico" : "Exibir histórico"}
+                title={isSidebar ? (isHistoryOpen ? "Ocultar histórico" : "Exibir histórico") : (isSidebarOpen ? "Ocultar histórico" : "Exibir histórico")}
               >
                 <Menu className="size-4" />
               </Button>
@@ -840,13 +898,84 @@ export function ChatInterface({
                 className={cn(
                   "w-full border border-border/40 transition-all duration-200 bg-card select-none shadow-xs",
                   isFocused && "border-primary/50 ring-2 ring-primary/10 shadow-md shadow-primary/5",
-                  (hasMessages || selectedReferences.length > 0)
+                  (hasMessages || selectedReferences.length > 0 || !!pendingAudioFile)
                     ? "rounded-2xl p-2 px-3 flex flex-col gap-2" 
                     : "rounded-full p-2.5 px-4 flex items-center gap-2"
                 )}
               >
-                {hasMessages || selectedReferences.length > 0 ? (
+                {hasMessages || selectedReferences.length > 0 || !!pendingAudioFile ? (
                   <>
+                    {/* Audio pending chip + action buttons */}
+                    {pendingAudioFile && (
+                      <motion.div
+                        initial={{ opacity: 0, y: 6 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: 6 }}
+                        className="w-full flex flex-col gap-2 px-1 pt-1 border-b border-border/10 pb-3"
+                      >
+                        {/* Audio file chip */}
+                        <div className="flex items-center gap-2 bg-violet-500/10 border border-violet-500/25 rounded-xl px-3 py-2">
+                          <div className="size-8 rounded-lg bg-violet-500/15 flex items-center justify-center shrink-0">
+                            <FileAudio className="size-4 text-violet-500" />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="text-xs font-semibold text-violet-600 dark:text-violet-400 truncate">{pendingAudioFile.name}</div>
+                            <div className="text-[10px] text-muted-foreground">{(pendingAudioFile.size / 1024 / 1024).toFixed(2)}MB &bull; Áudio pronto para processar</div>
+                          </div>
+                          {isTranscribing ? (
+                            <Loader2 className="size-4 text-violet-500 animate-spin shrink-0" />
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={handleRemoveAudio}
+                              className="hover:bg-foreground/10 rounded-full p-0.5 transition-colors cursor-pointer text-muted-foreground hover:text-foreground shrink-0"
+                            >
+                              <X className="size-3.5" />
+                            </button>
+                          )}
+                        </div>
+
+                        {/* Action selection */}
+                        {!isTranscribing ? (
+                          <div className="flex flex-col gap-1.5">
+                            <p className="text-[10px] text-muted-foreground px-1">O que deseja fazer com este áudio?</p>
+                            <div className="flex flex-wrap gap-1.5">
+                              <button
+                                type="button"
+                                onClick={() => handleSendAudio("both")}
+                                className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-primary text-white text-[11px] font-semibold transition-all hover:bg-primary/90 cursor-pointer"
+                              >
+                                <Sparkles className="size-3" />
+                                Transcrever e Resumir
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleSendAudio("transcribe")}
+                                className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-muted border border-border/40 text-foreground text-[11px] font-medium transition-all hover:bg-muted/80 cursor-pointer"
+                              >
+                                <Mic className="size-3" />
+                                Só transcrever
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleSendAudio("summarize")}
+                                className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-muted border border-border/40 text-foreground text-[11px] font-medium transition-all hover:bg-muted/80 cursor-pointer"
+                              >
+                                <Headphones className="size-3" />
+                                Só resumir
+                              </button>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-2 px-1">
+                            <Loader2 className="size-3.5 text-violet-500 animate-spin" />
+                            <span className="text-[11px] text-muted-foreground">
+                              {pendingAudioAction === "transcribe" ? "Transcrevendo..." : pendingAudioAction === "summarize" ? "Resumindo..." : "Transcrevendo e resumindo..."}
+                            </span>
+                          </div>
+                        )}
+                      </motion.div>
+                    )}
                     {selectedReferences.length > 0 && (
                       <div className="flex flex-wrap gap-1.5 px-1 pt-1 select-none border-b border-border/10 pb-2 w-full">
                         {selectedReferences.map((ref) => {
@@ -883,16 +1012,17 @@ export function ChatInterface({
                         })}
                       </div>
                     )}
+
                     <div className="w-full flex items-end gap-2">
                       <motion.button
                         layout
                         onClick={() => fileInputRef.current?.click()}
-                        disabled={isGenerating}
+                        disabled={isGenerating || isTranscribing}
                         className={cn(
                           "flex items-center justify-center rounded-full hover:bg-muted text-muted-foreground transition-all shrink-0 cursor-pointer disabled:opacity-40",
                           hasMessages ? "size-9" : "size-10"
                         )}
-                        title="Anexar arquivo"
+                        title="Anexar arquivo de áudio"
                       >
                         <Paperclip className="size-4" />
                       </motion.button>
@@ -901,8 +1031,8 @@ export function ChatInterface({
                         type="file"
                         ref={fileInputRef}
                         className="hidden"
-                        onChange={handleUploadSimulate}
-                        accept=".txt,.pdf,.png,.jpg,.jpeg,.json"
+                        onChange={handleFileSelect}
+                        accept="audio/*,.opus,.m4a,.mp3,.wav,.ogg,.webm,.aac"
                       />
 
                       <textarea
@@ -924,7 +1054,7 @@ export function ChatInterface({
                       <motion.button
                         layout
                         onClick={() => handleSend(inputValue)}
-                        disabled={(!inputValue.trim() && selectedReferences.length === 0) || isGenerating}
+                        disabled={(!inputValue.trim() && selectedReferences.length === 0) || isGenerating || isTranscribing}
                         className={cn(
                           "flex items-center justify-center text-white transition-all shrink-0 cursor-pointer rounded-full",
                           (inputValue.trim() || selectedReferences.length > 0) && !isGenerating
@@ -943,12 +1073,12 @@ export function ChatInterface({
                     <motion.button
                       layout
                       onClick={() => fileInputRef.current?.click()}
-                      disabled={isGenerating}
+                      disabled={isGenerating || isTranscribing}
                       className={cn(
                         "flex items-center justify-center rounded-full hover:bg-muted text-muted-foreground transition-all shrink-0 cursor-pointer disabled:opacity-40",
                         hasMessages ? "size-9" : "size-10"
                       )}
-                      title="Anexar arquivo"
+                      title="Anexar arquivo de áudio"
                     >
                       <Paperclip className="size-4" />
                     </motion.button>
@@ -957,8 +1087,8 @@ export function ChatInterface({
                       type="file"
                       ref={fileInputRef}
                       className="hidden"
-                      onChange={handleUploadSimulate}
-                      accept=".txt,.pdf,.png,.jpg,.jpeg,.json"
+                      onChange={handleFileSelect}
+                      accept="audio/*,.opus,.m4a,.mp3,.wav,.ogg,.webm,.aac"
                     />
 
                     <textarea
@@ -980,7 +1110,7 @@ export function ChatInterface({
                     <motion.button
                       layout
                       onClick={() => handleSend(inputValue)}
-                      disabled={(!inputValue.trim() && selectedReferences.length === 0) || isGenerating}
+                      disabled={(!inputValue.trim() && selectedReferences.length === 0) || isGenerating || isTranscribing}
                       className={cn(
                         "flex items-center justify-center text-white transition-all shrink-0 cursor-pointer rounded-full",
                         (inputValue.trim() || selectedReferences.length > 0) && !isGenerating

@@ -1,8 +1,8 @@
 {
   "id": "/",
-  "name": "FluencyLab",
-  "short_name": "FluencyLab",
-  "description": "Plataforma de ensino de idiomas",
+  "name": "WorkMate",
+  "short_name": "WorkMate",
+  "description": "Seu assistente pessoal",
   "start_url": "/hub",
   "scope": "/",
   "display": "standalone",
@@ -14,26 +14,13 @@
   "background_color": "#212121",
   "theme_color": "#212121",
   "categories": [
-    "education",
+    "work",
     "productivity"
   ],
   "protocol_handlers": [
     {
-      "protocol": "web+fluencylab",
+      "protocol": "web+workmate",
       "url": "/?url=%s"
-    }
-  ],
-  "shortcuts": [
-    {
-      "name": "Minhas Aulas",
-      "url": "/student/classes",
-      "icons": [
-        {
-          "src": "brand/logo-icon.png",
-          "sizes": "512x512",
-          "type": "image/png"
-        }
-      ]
     }
   ],
   "icons": [
@@ -110,34 +97,29 @@
       "purpose": "maskable"
     }
   ],
-  "screenshots": [
-    {
-      "src": "/screenshots/screenshot1.jpeg",
-      "sizes": "1024x1024",
-      "type": "image/jpeg",
-      "form_factor": "wide",
-      "label": "Área de Estudos no Computador"
-    },
-    {
-      "src": "/screenshots/screenshot2.jpeg",
-      "sizes": "1024x1024",
-      "type": "image/jpeg",
-      "form_factor": "narrow",
-      "label": "Área de Estudos no Celular"
-    },
-    {
-      "src": "/screenshots/screenshot3.jpeg",
-      "sizes": "1024x1024",
-      "type": "image/jpeg",
-      "form_factor": "narrow",
-      "label": "Área de Estudos no Celular"
-    },
-    {
-      "src": "/screenshots/screenshot4.jpeg",
-      "sizes": "1024x1024",
-      "type": "image/jpeg",
-      "form_factor": "narrow",
-      "label": "Área de Estudos no Celular"
+  "share_target": {
+    "action": "/hub/chat",
+    "method": "POST",
+    "enctype": "multipart/form-data",
+    "params": {
+      "title": "title",
+      "text": "text",
+      "url": "url",
+      "files": [
+        {
+          "name": "audio",
+          "accept": [
+            "audio/*",
+            ".opus",
+            ".m4a",
+            ".mp3",
+            ".wav",
+            ".ogg",
+            ".webm",
+            ".aac"
+          ]
+        }
+      ]
     }
-  ]
+  }
 }

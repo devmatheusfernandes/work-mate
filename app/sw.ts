@@ -361,4 +361,70 @@ self.addEventListener("sync", (event: SyncEvent) => {
   }
 });
 
+// Web Share Target: intercept POST from OS share sheet
+// When user shares audio to the PWA, this handler:
+// 1. Reads the file from multipart form data
+// 2. Stores it in IndexedDB under "pendingSharedAudio"
+// 3. Redirects user to /hub/chat?incoming-audio=1
+self.addEventListener("fetch", (event: FetchEvent) => {
+  const url = new URL(event.request.url);
+
+  if (
+    event.request.method === "POST" &&
+    url.pathname === "/hub/chat" &&
+    url.searchParams.has("share-target") === false &&
+    event.request.headers.get("content-type")?.includes("multipart/form-data")
+  ) {
+    event.respondWith(
+      (async () => {
+        try {
+          const formData = await event.request.formData();
+          const audioFile = formData.get("audio") as File | null;
+
+          if (audioFile) {
+            // Store file data in a well-known IndexedDB key so the page can retrieve it
+            const arrayBuffer = await audioFile.arrayBuffer();
+            const db = await openShareTargetDB();
+            const tx = db.transaction("pendingAudio", "readwrite");
+            const store = tx.objectStore("pendingAudio");
+            // Clear old pending item before storing new
+            store.clear();
+            store.add({
+              id: "latest",
+              name: audioFile.name,
+              type: audioFile.type || "audio/ogg",
+              size: audioFile.size,
+              data: arrayBuffer,
+              timestamp: Date.now(),
+            });
+            await new Promise<void>((resolve, reject) => {
+              tx.oncomplete = () => resolve();
+              tx.onerror = () => reject(tx.error);
+            });
+          }
+        } catch (err) {
+          console.error("[SW Share Target] Error storing audio:", err);
+        }
+
+        // Always redirect to chat page with incoming-audio flag
+        return Response.redirect("/hub/chat?incoming-audio=1", 303);
+      })()
+    );
+  }
+});
+
+function openShareTargetDB(): Promise<IDBDatabase> {
+  return new Promise((resolve, reject) => {
+    const request = indexedDB.open("share-target-db", 1);
+    request.onupgradeneeded = () => {
+      const db = request.result;
+      if (!db.objectStoreNames.contains("pendingAudio")) {
+        db.createObjectStore("pendingAudio", { keyPath: "id" });
+      }
+    };
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error);
+  });
+}
+
 serwist.addEventListeners();

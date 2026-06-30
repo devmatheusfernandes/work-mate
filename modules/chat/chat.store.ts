@@ -24,13 +24,17 @@ interface ChatState {
   isGenerating: boolean;
   isLoadingSessions: boolean;
   isLoadingMessages: boolean;
-  
+  pendingAudioFile: File | null;
+  isTranscribing: boolean;
+
   setSidebarOpen: (open: boolean) => void;
+  setPendingAudioFile: (file: File | null) => void;
   setCurrentSessionId: (sessionId: string | null) => Promise<void>;
   loadSessions: (type?: "active" | "archived") => Promise<void>;
   loadMessages: (sessionId: string) => Promise<void>;
   createNewSession: () => Promise<string | null>;
   sendMessage: (content: string) => Promise<void>;
+  sendAudioMessage: (file: File, mode: "transcribe" | "summarize" | "both", sessionId?: string | null) => Promise<void>;
   archiveSession: (sessionId: string, isArchived: boolean) => Promise<void>;
   deleteSession: (sessionId: string) => Promise<void>;
   clearMessages: () => void;
@@ -44,8 +48,11 @@ export const useChatStore = create<ChatState>((set, get) => ({
   isGenerating: false,
   isLoadingSessions: false,
   isLoadingMessages: false,
-  
+  pendingAudioFile: null,
+  isTranscribing: false,
+
   setSidebarOpen: (open) => set({ isSidebarOpen: open }),
+  setPendingAudioFile: (file) => set({ pendingAudioFile: file }),
   
   setCurrentSessionId: async (sessionId) => {
     set({ currentSessionId: sessionId });
@@ -251,12 +258,25 @@ export const useChatStore = create<ChatState>((set, get) => ({
       return;
     }
 
+    const assistantMessageId = "msg_placeholder_" + Math.random().toString(36).substring(7);
+
+    // Add placeholder assistant message right away to show the "Pensando..." state
+    const placeholderAssistantMessage: ChatMessage = {
+      id: assistantMessageId,
+      role: "assistant",
+      content: "",
+      createdAt: new Date(),
+      promptTokens: null,
+      candidatesTokens: null,
+      cost: null,
+      precision: null,
+    };
+
     set((state) => ({
-      messages: [...state.messages, userMessage],
+      messages: [...state.messages, userMessage, placeholderAssistantMessage],
       isGenerating: true,
     }));
 
-    const assistantMessageId = "msg_placeholder_" + Math.random().toString(36).substring(7);
     let responseText = "";
     type RawServerMessage = Omit<ChatMessage, "createdAt" | "role"> & { createdAt: string | Date; role: string };
     let serverMessage: RawServerMessage | null = null;
@@ -285,11 +305,11 @@ export const useChatStore = create<ChatState>((set, get) => ({
       responseText = "Desculpe, não consegui me conectar com a Inteligência Artificial.";
     }
 
-    // Create assistant placeholder message
+    // Update the placeholder with server details
     const assistantMessage: ChatMessage = {
       id: serverMessage?.id || assistantMessageId,
       role: "assistant",
-      content: "",
+      content: "", // will be streamed below
       createdAt: serverMessage ? new Date(serverMessage.createdAt) : new Date(),
       promptTokens: serverMessage?.promptTokens || null,
       candidatesTokens: serverMessage?.candidatesTokens || null,
@@ -298,7 +318,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
     };
 
     set((state) => ({
-      messages: [...state.messages, assistantMessage],
+      messages: state.messages.map((m) => m.id === assistantMessageId ? assistantMessage : m),
     }));
 
     // Stream simulation: output word-by-word
@@ -402,6 +422,64 @@ export const useChatStore = create<ChatState>((set, get) => ({
       }
     } catch (error) {
       console.error("Erro ao deletar sessão:", error);
+    }
+  },
+
+  sendAudioMessage: async (file: File, mode: "transcribe" | "summarize" | "both", sessionId?: string | null) => {
+    const store = get();
+    set({ isTranscribing: true });
+
+    // Ensure we have a session
+    let actualSessionId = sessionId ?? store.currentSessionId;
+    if (!actualSessionId) {
+      actualSessionId = await store.createNewSession();
+    }
+    if (!actualSessionId) {
+      toast.error("Não foi possível criar ou encontrar uma sessão de chat.");
+      set({ isTranscribing: false });
+      return;
+    }
+    // Switch to target session if different
+    if (actualSessionId !== store.currentSessionId) {
+      set({ currentSessionId: actualSessionId });
+      await store.loadMessages(actualSessionId);
+    }
+
+    // Build form data for API call
+    const formData = new FormData();
+    formData.append("audio", file);
+    formData.append("mode", mode);
+
+    try {
+      const res = await fetch("/api/chat/transcribe-audio", {
+        method: "POST",
+        body: formData,
+      });
+      const data = await res.json();
+
+      if (!res.ok || !data.success) {
+        toast.error(data.error || "Erro ao transcrever o áudio.");
+        set({ isTranscribing: false });
+        return;
+      }
+
+      // Build a user message that shows the audio context
+      const modeLabel = mode === "transcribe" ? "Transcrição" : mode === "summarize" ? "Resumo" : "Transcrição e Resumo";
+      
+      let audioContextMessage = `[🎵 Áudio enviado: **${file.name}** (${(file.size / 1024 / 1024).toFixed(1)}MB) — ${modeLabel}]\n\n${data.result}`;
+      
+      if (data.audioUrl) {
+        audioContextMessage = `[🎵 Áudio enviado: **${file.name}** (${(file.size / 1024 / 1024).toFixed(1)}MB) — ${modeLabel}](${data.audioUrl})\n\n${data.result}`;
+      }
+
+      set({ isTranscribing: false, pendingAudioFile: null });
+
+      // Send the audio result as a chat message (which the AI will then respond to)
+      await get().sendMessage(audioContextMessage);
+    } catch (error) {
+      console.error("Erro ao enviar áudio:", error);
+      toast.error("Erro de conexão ao processar o áudio.");
+      set({ isTranscribing: false });
     }
   },
 
