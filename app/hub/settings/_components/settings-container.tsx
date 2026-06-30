@@ -305,11 +305,11 @@ export function SettingsContainer({ initialCalendars, initialMemories, user, usa
   return (
     <div className="flex flex-col gap-6 md:flex-row md:items-start w-full pb-16">
       {/* Tabs Sidebar Selector */}
-      <aside className="w-full md:w-64 shrink-0 flex flex-row md:flex-col gap-1.5 border-b md:border-b-0 md:border-r border-border/30 pb-4 md:pb-0 md:pr-4">
+      <aside className="w-full md:w-64 shrink-0 flex flex-row md:flex-col gap-1.5 border-b md:border-b-0 md:border-r border-border/30 pb-4 md:pb-0 md:pr-4 overflow-x-auto no-scrollbar">
         <button
           onClick={() => setActiveTab("geral")}
           className={cn(
-            "flex items-center gap-2.5 px-4 py-2 text-xs font-semibold rounded-lg transition-all cursor-pointer flex-1 md:flex-none justify-center md:justify-start",
+            "flex items-center gap-2.5 px-4 py-2 text-xs font-semibold rounded-lg transition-all cursor-pointer shrink-0 md:shrink md:flex-none justify-center md:justify-start",
             activeTab === "geral"
               ? "bg-primary text-primary-foreground"
               : "text-muted-foreground hover:bg-muted/50 hover:text-foreground"
@@ -321,7 +321,7 @@ export function SettingsContainer({ initialCalendars, initialMemories, user, usa
         <button
           onClick={() => setActiveTab("calendario")}
           className={cn(
-            "flex items-center gap-2.5 px-4 py-2 text-xs font-semibold rounded-lg transition-all cursor-pointer flex-1 md:flex-none justify-center md:justify-start",
+            "flex items-center gap-2.5 px-4 py-2 text-xs font-semibold rounded-lg transition-all cursor-pointer shrink-0 md:shrink md:flex-none justify-center md:justify-start",
             activeTab === "calendario"
               ? "bg-primary text-primary-foreground"
               : "text-muted-foreground hover:bg-muted/50 hover:text-foreground"
@@ -333,7 +333,7 @@ export function SettingsContainer({ initialCalendars, initialMemories, user, usa
         <button
           onClick={() => setActiveTab("limites")}
           className={cn(
-            "flex items-center gap-2.5 px-4 py-2 text-xs font-semibold rounded-lg transition-all cursor-pointer flex-1 md:flex-none justify-center md:justify-start",
+            "flex items-center gap-2.5 px-4 py-2 text-xs font-semibold rounded-lg transition-all cursor-pointer shrink-0 md:shrink md:flex-none justify-center md:justify-start",
             activeTab === "limites"
               ? "bg-primary text-primary-foreground"
               : "text-muted-foreground hover:bg-muted/50 hover:text-foreground"
@@ -345,7 +345,7 @@ export function SettingsContainer({ initialCalendars, initialMemories, user, usa
         <button
           onClick={() => setActiveTab("memoria")}
           className={cn(
-            "flex items-center gap-2.5 px-4 py-2 text-xs font-semibold rounded-lg transition-all cursor-pointer flex-1 md:flex-none justify-center md:justify-start",
+            "flex items-center gap-2.5 px-4 py-2 text-xs font-semibold rounded-lg transition-all cursor-pointer shrink-0 md:shrink md:flex-none justify-center md:justify-start",
             activeTab === "memoria"
               ? "bg-primary text-primary-foreground"
               : "text-muted-foreground hover:bg-muted/50 hover:text-foreground"
@@ -357,7 +357,7 @@ export function SettingsContainer({ initialCalendars, initialMemories, user, usa
         <button
           onClick={() => setActiveTab("pwa")}
           className={cn(
-            "flex items-center gap-2.5 px-4 py-2 text-xs font-semibold rounded-lg transition-all cursor-pointer flex-1 md:flex-none justify-center md:justify-start",
+            "flex items-center gap-2.5 px-4 py-2 text-xs font-semibold rounded-lg transition-all cursor-pointer shrink-0 md:shrink md:flex-none justify-center md:justify-start",
             activeTab === "pwa"
               ? "bg-primary text-primary-foreground"
               : "text-muted-foreground hover:bg-muted/50 hover:text-foreground"
