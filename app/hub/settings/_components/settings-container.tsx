@@ -42,8 +42,19 @@ import {
   Play,
   ListOrdered,
   BrainCircuit,
+  Smartphone,
+  Download,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+
+interface BeforeInstallPromptEvent extends Event {
+  readonly platforms: string[];
+  readonly userChoice: Promise<{
+    outcome: "accepted" | "dismissed";
+    platform: string;
+  }>;
+  prompt(): Promise<void>;
+}
 
 interface UsageStats {
   storageUsedBytes: number;
@@ -104,7 +115,7 @@ function formatBytes(bytes: number): string {
 }
 
 export function SettingsContainer({ initialCalendars, initialMemories, user, usageStats }: SettingsContainerProps) {
-  const [activeTab, setActiveTab] = useState<"geral" | "calendario" | "limites" | "memoria">("geral");
+  const [activeTab, setActiveTab] = useState<"geral" | "calendario" | "limites" | "memoria" | "pwa">("geral");
   const { setTheme } = useTheme();
   const { themeColor, setThemeColor, mode, setMode } = useAppearanceStore();
   const { calendars, addCalendar, removeCalendar, importCalendar, syncCalendar } = useCalendarStore();
@@ -123,6 +134,50 @@ export function SettingsContainer({ initialCalendars, initialMemories, user, usa
   // Vectorization action states
   const [isEnqueueing, setIsEnqueueing] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
+
+  // PWA state
+  const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null);
+  const [isInstalled, setIsInstalled] = useState(false);
+
+  useEffect(() => {
+    // Check if already installed
+    if (typeof window !== "undefined") {
+      const isStandalone = window.matchMedia("(display-mode: standalone)").matches || 
+        ("standalone" in window.navigator && !!(window.navigator as unknown as { standalone: boolean }).standalone);
+        
+      if (isStandalone) {
+        // Use timeout to prevent synchronous state updates during render phase
+        setTimeout(() => setIsInstalled(true), 0);
+      }
+
+      const handleBeforeInstallPrompt = (e: Event) => {
+        e.preventDefault();
+        setDeferredPrompt(e as BeforeInstallPromptEvent);
+      };
+
+      const handleAppInstalled = () => {
+        setIsInstalled(true);
+        setDeferredPrompt(null);
+      };
+
+      window.addEventListener("beforeinstallprompt", handleBeforeInstallPrompt);
+      window.addEventListener("appinstalled", handleAppInstalled);
+
+      return () => {
+        window.removeEventListener("beforeinstallprompt", handleBeforeInstallPrompt);
+        window.removeEventListener("appinstalled", handleAppInstalled);
+      };
+    }
+  }, []);
+
+  const handleInstallClick = async () => {
+    if (!deferredPrompt) return;
+    deferredPrompt.prompt();
+    const { outcome } = await deferredPrompt.userChoice;
+    if (outcome === "accepted") {
+      setDeferredPrompt(null);
+    }
+  };
 
   useEffect(() => {
     // Seed/sync store with initial server data
@@ -298,6 +353,18 @@ export function SettingsContainer({ initialCalendars, initialMemories, user, usa
         >
           <BrainCircuit className="size-4" />
           Memória da IA
+        </button>
+        <button
+          onClick={() => setActiveTab("pwa")}
+          className={cn(
+            "flex items-center gap-2.5 px-4 py-2 text-xs font-semibold rounded-lg transition-all cursor-pointer flex-1 md:flex-none justify-center md:justify-start",
+            activeTab === "pwa"
+              ? "bg-primary text-primary-foreground"
+              : "text-muted-foreground hover:bg-muted/50 hover:text-foreground"
+          )}
+        >
+          <Smartphone className="size-4" />
+          Aplicativo
         </button>
       </aside>
 
@@ -606,6 +673,52 @@ export function SettingsContainer({ initialCalendars, initialMemories, user, usa
                     <span className="px-2 py-0.5 rounded-full bg-indigo-500/10 text-indigo-500 text-[9px] font-bold">Cosine Similarity</span>
                   </div>
                 </div>
+              </div>
+            </div>
+          </div>
+        ) : activeTab === "pwa" ? (
+          <div className="space-y-6">
+            <div className="item p-5 space-y-4">
+              <div className="flex items-center gap-2">
+                <Smartphone className="size-4 text-primary" />
+                <h3 className="text-sm font-bold uppercase tracking-wider text-muted-foreground/60">
+                  Aplicativo WorkMate (PWA)
+                </h3>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                O WorkMate pode ser instalado como um aplicativo nativo no seu computador ou celular para acesso rápido, uso offline e melhor experiência.
+              </p>
+              
+              <div className="mt-6 flex flex-col items-center justify-center p-8 border border-border/30 rounded-xl bg-muted/10">
+                {isInstalled ? (
+                  <>
+                    <div className="size-16 rounded-full bg-emerald-500/10 flex items-center justify-center mb-4">
+                      <CheckCircle2 className="size-8 text-emerald-500" />
+                    </div>
+                    <h4 className="text-lg font-bold text-foreground mb-2">Aplicativo Instalado</h4>
+                    <p className="text-xs text-muted-foreground text-center max-w-md">
+                      Você já está usando o WorkMate como um aplicativo ou ele já foi instalado no seu dispositivo.
+                    </p>
+                  </>
+                ) : (
+                  <>
+                    <div className="size-16 rounded-full bg-primary/10 flex items-center justify-center mb-4">
+                      <Download className="size-8 text-primary" />
+                    </div>
+                    <h4 className="text-lg font-bold text-foreground mb-2">Instalar Aplicativo</h4>
+                    <p className="text-xs text-muted-foreground text-center max-w-md mb-6">
+                      Instale o WorkMate para ter uma experiência de tela cheia e acesso rápido direto na sua tela inicial ou desktop.
+                    </p>
+                    <Button 
+                      onClick={handleInstallClick} 
+                      disabled={!deferredPrompt}
+                      className="gap-2"
+                    >
+                      <Download className="size-4" />
+                      {deferredPrompt ? "Instalar Agora" : "Instalação não suportada neste navegador"}
+                    </Button>
+                  </>
+                )}
               </div>
             </div>
           </div>

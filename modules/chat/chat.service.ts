@@ -221,7 +221,7 @@ ${eventsText}`);
     try {
       const memories = await memoryService.getUserMemories(userId);
       if (memories && memories.length > 0) {
-        userMemoriesContext = memories.map((m: any) => `- ${m.content}`).join("\n");
+        userMemoriesContext = memories.map((m: { content: string }) => `- ${m.content}`).join("\n");
       }
     } catch (err) {
       console.error("Erro ao carregar memórias do usuário:", err);

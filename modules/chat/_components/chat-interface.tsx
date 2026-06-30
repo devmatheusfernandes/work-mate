@@ -274,7 +274,7 @@ export function ChatInterface({
   // Auto-scroll to bottom of messages
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages, isGenerating]);
+  }, [messages, isGenerating, isTranscribing, pendingAudioFile]);
 
   const handleSend = async (text: string) => {
     if ((!text.trim() && selectedReferences.length === 0) || isGenerating) return;
@@ -618,7 +618,7 @@ export function ChatInterface({
               </div>
             );
           }
-        } catch (e) {
+        } catch {
           // ignore parsing error, fallback below
         }
       }
