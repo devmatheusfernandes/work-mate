@@ -3,6 +3,8 @@
 import { useState, useEffect } from "react";
 import { toast } from "sonner";
 import { enqueueAllPendingNotesAction, processUserVectorizationQueueAction } from "@/modules/vector/vector.actions";
+import { saveMemoryAction, deleteMemoryAction } from "@/modules/memory/memory.actions";
+import { AiMemory } from "@/modules/memory/memory.schema";
 import { useTheme } from "next-themes";
 import { useAppearanceStore, ThemeColor, ThemeMode } from "@/modules/appearance/appearance.store";
 import { useCalendarStore } from "@/modules/calendar/calendar.store";
@@ -39,6 +41,7 @@ import {
   FileSpreadsheet,
   Play,
   ListOrdered,
+  BrainCircuit,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -63,6 +66,7 @@ interface UsageStats {
 
 interface SettingsContainerProps {
   initialCalendars: Calendar[];
+  initialMemories: AiMemory[];
   usageStats: UsageStats;
   user: {
     id: string;
@@ -99,8 +103,8 @@ function formatBytes(bytes: number): string {
   return `${parseFloat((bytes / Math.pow(k, i)).toFixed(1))} ${sizes[i]}`;
 }
 
-export function SettingsContainer({ initialCalendars, user, usageStats }: SettingsContainerProps) {
-  const [activeTab, setActiveTab] = useState<"geral" | "calendario" | "limites">("geral");
+export function SettingsContainer({ initialCalendars, initialMemories, user, usageStats }: SettingsContainerProps) {
+  const [activeTab, setActiveTab] = useState<"geral" | "calendario" | "limites" | "memoria">("geral");
   const { setTheme } = useTheme();
   const { themeColor, setThemeColor, mode, setMode } = useAppearanceStore();
   const { calendars, addCalendar, removeCalendar, importCalendar, syncCalendar } = useCalendarStore();
@@ -110,6 +114,11 @@ export function SettingsContainer({ initialCalendars, user, usageStats }: Settin
   const [selectedColor, setSelectedColor] = useState("bg-blue-500");
   const [sharedUrl, setSharedUrl] = useState("");
   const [activeFormTab, setActiveFormTab] = useState<"local" | "shared">("local");
+
+  // Memory State
+  const [memories, setMemories] = useState<AiMemory[]>(initialMemories);
+  const [newMemoryContent, setNewMemoryContent] = useState("");
+  const [isSavingMemory, setIsSavingMemory] = useState(false);
 
   // Vectorization action states
   const [isEnqueueing, setIsEnqueueing] = useState(false);
@@ -196,6 +205,48 @@ export function SettingsContainer({ initialCalendars, user, usageStats }: Settin
     }
   };
 
+  const handleAddMemory = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newMemoryContent.trim()) return;
+    setIsSavingMemory(true);
+    const toastId = toast.loading("Salvando memória...");
+    try {
+      const res = await saveMemoryAction({ content: newMemoryContent.trim(), isAuto: false });
+      if (res?.data?.success) {
+        toast.success("Memória salva com sucesso!", { id: toastId });
+        setMemories([{
+          id: res.data.memoryId as string,
+          userId: user.id,
+          content: newMemoryContent.trim(),
+          isAuto: false,
+          createdAt: new Date(),
+        }, ...memories]);
+        setNewMemoryContent("");
+      } else {
+        toast.error("Erro ao salvar memória.", { id: toastId });
+      }
+    } catch {
+      toast.error("Erro inesperado ao salvar.", { id: toastId });
+    } finally {
+      setIsSavingMemory(false);
+    }
+  };
+
+  const handleDeleteMemory = async (id: string) => {
+    const toastId = toast.loading("Excluindo memória...");
+    try {
+      const res = await deleteMemoryAction({ id });
+      if (res?.data?.success) {
+        toast.success("Memória excluída.", { id: toastId });
+        setMemories(memories.filter(m => m.id !== id));
+      } else {
+        toast.error("Erro ao excluir memória.", { id: toastId });
+      }
+    } catch {
+      toast.error("Erro inesperado.", { id: toastId });
+    }
+  };
+
   return (
     <div className="flex flex-col gap-6 md:flex-row md:items-start w-full pb-16">
       {/* Tabs Sidebar Selector */}
@@ -236,11 +287,95 @@ export function SettingsContainer({ initialCalendars, user, usageStats }: Settin
           <BarChart3 className="size-4" />
           Uso & Limites
         </button>
+        <button
+          onClick={() => setActiveTab("memoria")}
+          className={cn(
+            "flex items-center gap-2.5 px-4 py-2 text-xs font-semibold rounded-lg transition-all cursor-pointer flex-1 md:flex-none justify-center md:justify-start",
+            activeTab === "memoria"
+              ? "bg-primary text-primary-foreground"
+              : "text-muted-foreground hover:bg-muted/50 hover:text-foreground"
+          )}
+        >
+          <BrainCircuit className="size-4" />
+          Memória da IA
+        </button>
       </aside>
 
       {/* Tabs Content Panel */}
       <div className="flex-1 w-full animate-in fade-in slide-in-from-bottom-4 duration-300">
-        {activeTab === "limites" ? (
+        {activeTab === "memoria" ? (
+          <div className="space-y-6">
+            <div className="item p-5 space-y-4">
+              <div className="flex items-center gap-2">
+                <BrainCircuit className="size-4 text-purple-500" />
+                <h3 className="text-sm font-bold uppercase tracking-wider text-purple-500">
+                  Cérebro e Memória
+                </h3>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                A IA do WorkMate lembra automaticamente de informações importantes que você menciona no chat (como sua rotina, preferências, etc). Você pode gerenciar essas memórias aqui ou adicionar fatos manualmente que deseja que a IA saiba para sempre.
+              </p>
+
+              <form onSubmit={handleAddMemory} className="flex gap-2 items-start mt-4">
+                <input
+                  type="text"
+                  value={newMemoryContent}
+                  onChange={(e) => setNewMemoryContent(e.target.value)}
+                  placeholder="Ex: Eu prefiro respostas curtas e diretas ao ponto..."
+                  className="input h-9 px-3 text-xs flex-1 focus:outline-none"
+                />
+                <Button type="submit" size="sm" disabled={!newMemoryContent.trim() || isSavingMemory} className="h-9 shrink-0">
+                  <Plus className="size-3 mr-1" /> Adicionar Fato
+                </Button>
+              </form>
+            </div>
+
+            <div className="item p-5 space-y-4">
+              <h3 className="text-sm font-bold uppercase tracking-wider text-muted-foreground/60">
+                Fatos Armazenados
+              </h3>
+              
+              {memories.length === 0 ? (
+                <Empty className="py-8">
+                  <EmptyHeader>
+                    <EmptyMedia variant="icon">
+                      <BrainCircuit className="size-5 text-muted-foreground" />
+                    </EmptyMedia>
+                    <EmptyTitle>Nenhuma memória ainda</EmptyTitle>
+                    <EmptyDescription>
+                      Fale com a IA no chat e ela aprenderá sobre você, ou adicione algo acima.
+                    </EmptyDescription>
+                  </EmptyHeader>
+                </Empty>
+              ) : (
+                <div className="flex flex-col gap-2">
+                  {memories.map(memory => (
+                    <div key={memory.id} className="flex items-center justify-between p-3 rounded-xl bg-muted/20 border border-border/30">
+                      <div className="flex flex-col gap-0.5">
+                        <span className="text-sm font-medium text-foreground">{memory.content}</span>
+                        <div className="flex items-center gap-2">
+                          <span className="text-[10px] text-muted-foreground">
+                            {new Date(memory.createdAt).toLocaleDateString("pt-BR")}
+                          </span>
+                          <span className={cn("text-[9px] px-1.5 py-0.5 rounded-full font-semibold", memory.isAuto ? "bg-blue-500/10 text-blue-500" : "bg-purple-500/10 text-purple-500")}>
+                            {memory.isAuto ? "Aprendido Sozinho" : "Adicionado Manualmente"}
+                          </span>
+                        </div>
+                      </div>
+                      <button 
+                        onClick={() => handleDeleteMemory(memory.id)}
+                        className="p-1.5 rounded-md text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
+                        title="Excluir Memória"
+                      >
+                        <Trash2 className="size-4" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        ) : activeTab === "limites" ? (
           <div className="space-y-6">
             {/* Storage Usage */}
             <div className="item p-5 space-y-4">

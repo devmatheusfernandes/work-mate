@@ -2,6 +2,7 @@ import { chatRepository } from "./chat.repository";
 import { notesService } from "@/modules/notes/notes.service";
 import { vectorService } from "@/modules/vector/vector.service";
 import { calendarService } from "@/modules/calendar/calendar.service";
+import { memoryService } from "@/modules/memory/memory.service";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 
 const apiKey = process.env.GEMINI_API_KEY;
@@ -215,6 +216,17 @@ ${eventsText}`);
       console.error("Erro ao carregar contexto de calendário para o prompt:", err);
     }
 
+    // 3.8 Load AI Memories
+    let userMemoriesContext = "";
+    try {
+      const memories = await memoryService.getUserMemories(userId);
+      if (memories && memories.length > 0) {
+        userMemoriesContext = memories.map((m: any) => `- ${m.content}`).join("\n");
+      }
+    } catch (err) {
+      console.error("Erro ao carregar memórias do usuário:", err);
+    }
+
     // 4. Save the user's message in the database
     const userMsgId = "msg_" + Math.random().toString(36).substring(2, 11);
     const userMessage = await chatRepository.createMessage({
@@ -271,7 +283,22 @@ Para criar uma NOTA:
 
 O usuário verá um botão mágico no lugar desse JSON para criar o item instantaneamente! Não use mais o formato de link antigo. Use sempre o bloco JSON quando quiser oferecer a criação de algo.
 
+7. MEMÓRIA DE LONGO PRAZO: Se o usuário compartilhar um fato importante sobre ele, suas preferências, sua rotina ou qualquer informação relevante que você deva lembrar para o futuro, GERE UMA AÇÃO JSON para salvar isso na memória:
+
+\`\`\`json
+{
+  "action": "save-memory",
+  "content": "Fato importante sobre o usuário (ex: O usuário costuma estudar à noite)"
+}
+\`\`\`
+
+Isso salvará a memória de forma silenciosa para que você tenha esse contexto em sessões futuras. Faça isso de forma autônoma sempre que notar uma informação perene importante.
+
 Abaixo estão as informações reais do usuário (notas, tarefas e compromissos da agenda) para você usar como contexto:
+
+=== FATOS E MEMÓRIAS SOBRE O USUÁRIO ===
+${userMemoriesContext || "Nenhuma memória registrada ainda."}
+========================================
 
 === SUMÁRIO GERAL DE NOTAS E TAREFAS ATIVAS ===
 ${globalSummaryContext || "Nenhuma nota ou tarefa ativa cadastrada."}

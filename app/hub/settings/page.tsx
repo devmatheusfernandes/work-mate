@@ -3,6 +3,7 @@ import { getCurrentUser } from "@/lib/safe-action";
 import { SettingsContainer } from "./_components/settings-container";
 import { Header } from "@/components/layout/header";
 import { redirect } from "next/navigation";
+import { memoryService } from "@/modules/memory/memory.service";
 import { notesStorageService } from "@/modules/notes/notes-storage.service";
 import { db } from "@/lib/db";
 import { embeddingsQueueTable } from "@/modules/vector/vector.schema";
@@ -22,6 +23,7 @@ export default async function SettingsPage() {
     queuePendingResult,
     queueErrorResult,
     totalActiveNotesResult,
+    memories,
   ] = await Promise.all([
     calendarService.getCalendars(user.id),
     notesStorageService.getUserStorageUsage(user.id),
@@ -45,6 +47,8 @@ export default async function SettingsPage() {
       .select({ total: count() })
       .from(notesTable)
       .where(and(eq(notesTable.userId, user.id), eq(notesTable.trashed, false))),
+    // User AI Memories
+    memoryService.getUserMemories(user.id),
   ]);
 
   const vectorizedItems = syncedResult[0]?.total ?? 0;
@@ -85,7 +89,7 @@ export default async function SettingsPage() {
         user={user}
       />
       <main className="container">
-        <SettingsContainer initialCalendars={calendars} user={user} usageStats={usageStats} />
+        <SettingsContainer initialCalendars={calendars} initialMemories={memories} user={user} usageStats={usageStats} />
       </main>
     </>
   );

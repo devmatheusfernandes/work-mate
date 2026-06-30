@@ -15,6 +15,13 @@
       "when": 1782536875839,
       "tag": "0001_aspiring_spectrum",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1782792764038,
+      "tag": "0002_acoustic_archangel",
+      "breakpoints": true
     }
   ]
 }

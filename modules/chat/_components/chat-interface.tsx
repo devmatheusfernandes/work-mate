@@ -22,7 +22,8 @@ import {
   Loader2,
   Headphones,
   FilePlus,
-  CheckSquare
+  CheckSquare,
+  BrainCircuit
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -31,6 +32,7 @@ import { Button } from "@/components/ui/button";
 import { useCalendarStore } from "@/modules/calendar/calendar.store";
 import { getNotesAction, createNoteAction } from "@/modules/notes/notes.actions";
 import { convertChatToNoteAction } from "@/modules/chat/chat.actions";
+import { saveMemoryAction } from "@/modules/memory/memory.actions";
 import { Note } from "@/modules/notes/notes.schema";
 import { Header } from "@/components/layout/header";
 import { useDevice } from "@/hooks/ui/use-device";
@@ -116,6 +118,7 @@ export function ChatInterface({
   // Action Tracking State
   const [createdActions, setCreatedActions] = useState<Record<string, Note>>({});
   const [creatingActions, setCreatingActions] = useState<Set<string>>(new Set());
+  const processedMemoriesRef = useRef<Set<string>>(new Set());
 
   // Fetch mention context data
   useEffect(() => {
@@ -138,6 +141,39 @@ export function ChatInterface({
     
     fetchMentionData();
   }, []);
+
+  // Auto-save memories effect
+  useEffect(() => {
+    messages.forEach((msg) => {
+      if (msg.role !== "assistant") return;
+      const parts = msg.content.split(/(```json\n[\s\S]*?\n```)/);
+      parts.forEach((part) => {
+        if (part.startsWith("```json")) {
+          const jsonStr = part.replace(/^```json\n/, "").replace(/\n```$/, "");
+          try {
+            const data = JSON.parse(jsonStr);
+            if (data.action === "save-memory" && data.content) {
+              const memoryKey = msg.id + "_" + JSON.stringify(data);
+              if (!processedMemoriesRef.current.has(memoryKey)) {
+                processedMemoriesRef.current.add(memoryKey);
+                
+                // Dispara o save silenciosamente
+                saveMemoryAction({ content: data.content, isAuto: true })
+                  .then(res => {
+                    if (res?.data?.success) {
+                      toast.success("✨ A IA guardou uma nova informação na memória!");
+                    }
+                  })
+                  .catch(console.error);
+              }
+            }
+          } catch {
+            // ignore
+          }
+        }
+      });
+    });
+  }, [messages]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const value = e.target.value;
@@ -377,7 +413,13 @@ export function ChatInterface({
     );
   };
 
-  const handleAdvancedQuickCreate = async (data: any) => {
+  const handleAdvancedQuickCreate = async (data: {
+    action: "create-task" | "create-note";
+    title?: string;
+    content?: string;
+    taskDeadline?: string;
+    taskSubtasks?: string[];
+  }) => {
     const actionKey = JSON.stringify(data);
     if (creatingActions.has(actionKey) || createdActions[actionKey]) return; // Prevent double creation
 
@@ -512,9 +554,20 @@ export function ChatInterface({
         const jsonStr = part.replace(/^```json\n/, "").replace(/\n```$/, "");
         try {
           const data = JSON.parse(jsonStr);
+          if (data.action === "save-memory") {
+            return (
+              <div key={index} className="my-2 p-3 bg-purple-500/10 border border-purple-500/20 rounded-xl flex items-start gap-3">
+                <BrainCircuit className="size-5 text-purple-500 mt-0.5 shrink-0" />
+                <div className="flex flex-col">
+                  <span className="text-sm font-semibold text-purple-500">Memória Atualizada</span>
+                  <span className="text-xs text-muted-foreground italic mt-0.5">{data.content}</span>
+                </div>
+              </div>
+            );
+          }
+
           if (data.action === "create-task" || data.action === "create-note") {
             const isTask = data.action === "create-task";
-            const type = isTask ? "task" : "note";
             const title = data.title || (isTask ? "Nova Tarefa" : "Nova Nota");
             const actionKey = JSON.stringify(data);
             const isCreating = creatingActions.has(actionKey);
