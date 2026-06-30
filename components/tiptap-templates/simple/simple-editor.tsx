@@ -16,6 +16,10 @@ import { Highlight } from "@tiptap/extension-highlight"
 import { Subscript } from "@tiptap/extension-subscript"
 import { Superscript } from "@tiptap/extension-superscript"
 import { Selection } from "@tiptap/extensions"
+import { Table } from "@tiptap/extension-table"
+import { TableRow } from "@tiptap/extension-table-row"
+import { TableCell } from "@tiptap/extension-table-cell"
+import { TableHeader } from "@tiptap/extension-table-header"
 import { CustomMentionNode } from "@/components/tiptap-node/mention-node/mention-node-extension"
 import { getMentionSuggestionConfig } from "@/components/tiptap-node/mention-node/mention-suggestion"
 
@@ -39,9 +43,11 @@ import "@/components/tiptap-node/list-node/list-node.scss"
 import "@/components/tiptap-node/image-node/image-node.scss"
 import "@/components/tiptap-node/heading-node/heading-node.scss"
 import "@/components/tiptap-node/paragraph-node/paragraph-node.scss"
+import "@/components/tiptap-node/table-node/table-node.scss"
 
 // --- Tiptap UI ---
 import { HeadingDropdownMenu } from "@/components/tiptap-ui/heading-dropdown-menu"
+import { TableDropdownMenu } from "@/components/tiptap-ui/table-dropdown-menu"
 import { ImageUploadButton } from "@/components/tiptap-ui/image-upload-button"
 import { ListDropdownMenu } from "@/components/tiptap-ui/list-dropdown-menu"
 import { BlockquoteButton } from "@/components/tiptap-ui/blockquote-button"
@@ -152,6 +158,7 @@ const MainToolbarContent = ({
 
       <ToolbarGroup>
         <HeadingDropdownMenu modal={false} levels={[1, 2, 3, 4]} />
+        <TableDropdownMenu modal={false} />
         <ListDropdownMenu
           modal={false}
           types={["bulletList", "orderedList", "taskList"]}
@@ -287,6 +294,10 @@ export function SimpleEditor({
       Superscript,
       Subscript,
       Selection,
+      Table.configure({ resizable: true }),
+      TableRow,
+      TableHeader,
+      TableCell,
       CustomMentionNode.configure({
         HTMLAttributes: {
           class: "mention",
